@@ -66,6 +66,7 @@ export enum Op {
 export interface Inst {
   op: Op;
   arg?: number | string | number[];
+  sub?: Inst[];  // sub-program for ARR_MAP/ARR_FILTER, CALL
 }
 
 // ── AI Intent (what AI sends) ───────────────────────────────

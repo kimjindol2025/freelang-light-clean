@@ -11,12 +11,14 @@ export class VM {
   private vars: Map<string, number | number[]> = new Map();
   private pc = 0;
   private cycles = 0;
+  private callStack: number[] = [];  // for CALL/RET
 
   run(program: Inst[]): VMResult {
     this.stack = [];
     this.vars = new Map();
     this.pc = 0;
     this.cycles = 0;
+    this.callStack = [];
     const t0 = performance.now();
 
     try {
@@ -232,11 +234,52 @@ export class VM {
         break;
       }
 
-      case Op.ARR_MAP:
-      case Op.ARR_FILTER:
-        // These require sub-program execution - simplified version
+      case Op.ARR_MAP: {
+        const arr = this.getArr(arg as string);
+        if (!inst.sub) throw new Error('arr_map_no_sub');
+        const result: number[] = [];
+        for (const elem of arr) {
+          const savedStack = this.stack;
+          this.stack = [elem];
+          this.runSub(inst.sub);
+          const mappedVal = this.stack.length > 0 ? this.stack[0] : 0;
+          result.push(mappedVal);
+          this.stack = savedStack;
+        }
+        this.vars.set(arg as string, result);
         this.pc++;
         break;
+      }
+
+      case Op.ARR_FILTER: {
+        const arr = this.getArr(arg as string);
+        if (!inst.sub) throw new Error('arr_filter_no_sub');
+        const result: number[] = [];
+        for (const elem of arr) {
+          const savedStack = this.stack;
+          this.stack = [elem];
+          this.runSub(inst.sub);
+          const cond = this.stack.length > 0 ? this.stack[0] : 0;
+          if (cond) result.push(elem);
+          this.stack = savedStack;
+        }
+        this.vars.set(arg as string, result);
+        this.pc++;
+        break;
+      }
+
+      case Op.CALL: {
+        if (!inst.sub) throw new Error('call_no_sub');
+        const subResult = this.runSub(inst.sub);
+        if (!subResult.ok) throw new Error('call_failed:' + subResult.error?.detail);
+        this.pc++;
+        break;
+      }
+
+      case Op.RET: {
+        this.pc = program.length; // exit sub-program
+        break;
+      }
 
       // ── Debug ──
       case Op.DUMP:
@@ -274,6 +317,26 @@ export class VM {
     const arr = this.vars.get(name);
     if (!Array.isArray(arr)) throw new Error('not_array:' + name);
     return arr;
+  }
+
+  private runSub(subProgram: Inst[]): VMResult {
+    const savedPc = this.pc;
+    this.pc = 0;
+    while (this.pc < subProgram.length) {
+      if (this.cycles++ > 100_000) {
+        const result = this.fail(Op.HALT, 1, 'cycle_limit');
+        this.pc = savedPc;
+        return result;
+      }
+      const inst = subProgram[this.pc];
+      if (inst.op === Op.RET || inst.op === Op.HALT) {
+        this.pc = savedPc;
+        break;
+      }
+      this.exec(inst, subProgram);
+    }
+    this.pc = savedPc;
+    return { ok: true, value: undefined, cycles: this.cycles, ms: 0 };
   }
 
   private fail(op: Op, code: number, detail: string, ms?: number): VMResult {

@@ -110,43 +110,23 @@ describe('VM', () => {
       // loop start (4)
       { op: Op.LOAD, arg: 'i' },   // 4: push i
       { op: Op.PUSH, arg: 5 },     // 5: push 5
-      { op: Op.GT },               // 6: i > 5?
-      { op: Op.JMP_IF, arg: 16 },  // 7: if true, exit loop
+      { op: Op.LTE },              // 6: i <= 5?
+      { op: Op.JMP_NOT, arg: 17 }, // 7: if false, exit loop
       // body
       { op: Op.LOAD, arg: 'sum' }, // 8
       { op: Op.LOAD, arg: 'i' },   // 9
       { op: Op.ADD },              // 10: sum + i
-      { op: Op.STORE, arg: 'sum' },// 11: sum = sum + i
-      { op: Op.LOAD, arg: 'i' },   // 12
-      { op: Op.PUSH, arg: 1 },     // 13
-      { op: Op.ADD },              // 14: i + 1
-      { op: Op.STORE, arg: 'i' },  // 15: i = i + 1
-      { op: Op.JMP, arg: 4 },      // 16: goto loop start -- WRONG: should be before exit
-    ]);
-    // Actually let me fix this - the JMP should be at 16, exit at 17
-    // Let me redo:
-    const r2 = vm.run([
-      { op: Op.PUSH, arg: 0 },     // 0
-      { op: Op.STORE, arg: 'sum' }, // 1
-      { op: Op.PUSH, arg: 1 },     // 2
-      { op: Op.STORE, arg: 'i' },  // 3
-      // loop check (4)
-      { op: Op.LOAD, arg: 'i' },   // 4
-      { op: Op.PUSH, arg: 5 },     // 5
-      { op: Op.GT },               // 6: i > 5?
-      { op: Op.JMP_IF, arg: 15 },  // 7: if true, exit to HALT
-      // body
-      { op: Op.LOAD, arg: 'sum' }, // 8
-      { op: Op.LOAD, arg: 'i' },   // 9
-      { op: Op.ADD },              // 10
       { op: Op.STORE, arg: 'sum' },// 11
       { op: Op.LOAD, arg: 'i' },   // 12
       { op: Op.PUSH, arg: 1 },     // 13
-      { op: Op.ADD },              // 14
-      { op: Op.STORE, arg: 'i' },  // 15 -- wait, index conflict with JMP target
+      { op: Op.ADD },              // 14: i + 1
+      { op: Op.STORE, arg: 'i' },  // 15
+      { op: Op.JMP, arg: 4 },      // 16: goto loop start
+      // exit (17)
+      { op: Op.LOAD, arg: 'sum' }, // 17
     ]);
-    // This is getting complex. Let me use a cleaner approach:
-    expect(r2.ok || true).toBe(true); // placeholder
+    expect(r.ok).toBe(true);
+    expect(r.value).toBe(15); // 1+2+3+4+5 = 15
   });
 
   // ── Array ──
@@ -229,6 +209,68 @@ describe('VM', () => {
     const r = vm.run(program);
     expect(r.ok).toBe(true);
     expect(r.value).toBe(2); // sorted: [2, 5, 8], first = 2
+  });
+
+  // ── Array MAP/FILTER ──
+  test('array map: double each element', () => {
+    const program: Inst[] = [
+      { op: Op.ARR_NEW, arg: 'a' },
+      { op: Op.PUSH, arg: 1 },
+      { op: Op.ARR_PUSH, arg: 'a' },
+      { op: Op.PUSH, arg: 2 },
+      { op: Op.ARR_PUSH, arg: 'a' },
+      { op: Op.PUSH, arg: 3 },
+      { op: Op.ARR_PUSH, arg: 'a' },
+      // map: x => x * 2
+      { op: Op.ARR_MAP, arg: 'a', sub: [
+        { op: Op.DUP },           // duplicate top of stack (the element)
+        { op: Op.ADD },           // x + x = 2*x
+        { op: Op.RET },
+      ]},
+    ];
+    const r = vm.run(program);
+    expect(r.ok).toBe(true);
+    // After map, a should be [2, 4, 6]
+    expect((r as any).value).toEqual(undefined); // map modifies in place
+  });
+
+  test('array filter: keep only > 2', () => {
+    const program: Inst[] = [
+      { op: Op.ARR_NEW, arg: 'a' },
+      { op: Op.PUSH, arg: 1 },
+      { op: Op.ARR_PUSH, arg: 'a' },
+      { op: Op.PUSH, arg: 3 },
+      { op: Op.ARR_PUSH, arg: 'a' },
+      { op: Op.PUSH, arg: 2 },
+      { op: Op.ARR_PUSH, arg: 'a' },
+      { op: Op.PUSH, arg: 5 },
+      { op: Op.ARR_PUSH, arg: 'a' },
+      // filter: x => x > 2
+      { op: Op.ARR_FILTER, arg: 'a', sub: [
+        { op: Op.PUSH, arg: 2 },
+        { op: Op.GT },            // x > 2
+        { op: Op.RET },
+      ]},
+      { op: Op.ARR_LEN, arg: 'a' },
+    ];
+    const r = vm.run(program);
+    expect(r.ok).toBe(true);
+    expect(r.value).toBe(2);  // [3, 5] after filter
+  });
+
+  // ── Function Call (sub-program execution) ──
+  test('function call: execute sub-program', () => {
+    const add_two: Inst[] = [
+      { op: Op.DUP },           // dup top stack
+      { op: Op.ADD },           // x + x
+      { op: Op.RET },
+    ];
+    const r = vm.run([
+      { op: Op.PUSH, arg: 5 },
+      { op: Op.CALL, arg: 'double', sub: add_two },
+    ]);
+    expect(r.ok).toBe(true);
+    expect(r.value).toBe(10); // 5 * 2
   });
 
   // ── Error cases ──
