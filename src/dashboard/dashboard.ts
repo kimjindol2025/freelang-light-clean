@@ -6,8 +6,8 @@
  */
 
 import { feedbackCollector, UserFeedback } from '../feedback/collector';
-// import { patternUpdater, PatternUpdater } from '../learning/pattern-updater'; // Deprecated: use PatternUpdater class
-// import { autoImprover, AutoImprover } from '../learning/auto-improver'; // Disabled for Week 4
+import { patternUpdater, PatternUpdater } from '../learning/pattern-updater';
+import { autoImprover, AutoImprover } from '../learning/auto-improver';
 
 export interface DashboardStats {
   total_patterns: number;
@@ -75,7 +75,9 @@ export class Dashboard {
         : 0;
 
     // 승인율 평균
-    const approvalRates = allStats.map(s => s.approval_rate);
+    const approvalRates = allStats
+      .map(s => s.approvalRate)
+      .filter(rate => !isNaN(rate) && rate !== undefined);
     const avgApprovalRate =
       approvalRates.length > 0
         ? approvalRates.reduce((a, b) => a + b) / approvalRates.length

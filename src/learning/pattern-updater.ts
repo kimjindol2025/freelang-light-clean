@@ -28,6 +28,9 @@ export interface PatternStats {
   modificationRate: number;
   avgAccuracy: number;
   lastUpdated: number;
+  approvedCount?: number;
+  rejectedCount?: number;
+  modifiedCount?: number;
 }
 
 export class PatternUpdater {
@@ -464,14 +467,42 @@ export class PatternUpdater {
    * 호환성: 패턴 통계 (이전 API)
    */
   getStats(operation: string): any {
-    return this.patternStats.get(operation) || null;
+    const stats = this.patternStats.get(operation);
+    if (!stats) return null;
+
+    // Legacy format for Phase 7 compatibility
+    return {
+      id: operation,
+      total_interactions: stats.totalFeedback,
+      approved: Math.round(stats.totalFeedback * stats.approvalRate),
+      rejected: Math.round(stats.totalFeedback * stats.rejectionRate),
+      modified: Math.round(stats.totalFeedback * stats.modificationRate),
+      approval_rate: stats.approvalRate,
+      rejection_rate: stats.rejectionRate,
+      modification_rate: stats.modificationRate,
+      confidence: stats.approvalRate,
+      last_updated: stats.lastUpdated,
+    };
   }
 
   /**
    * 호환성: 모든 패턴 통계 (이전 API)
    */
   getAllStats(): any[] {
-    return Array.from(this.patternStats.values());
+    return Array.from(this.patternStats.values())
+      .map(stats => ({
+        id: stats.operation,
+        total_interactions: stats.totalFeedback,
+        approved: stats.approvedCount || 0,
+        rejected: stats.rejectedCount || 0,
+        modified: stats.modifiedCount || 0,
+        approval_rate: stats.approvalRate,
+        rejection_rate: stats.rejectionRate,
+        modification_rate: stats.modificationRate,
+        confidence: stats.approvalRate,
+        last_updated: stats.lastUpdated,
+      }))
+      .sort((a, b) => b.total_interactions - a.total_interactions); // Sort by interaction count descending
   }
 
   /**
@@ -551,8 +582,35 @@ const variationCounts = new Map<string, Map<string, number>>();
 /**
  * 호환성: 패턴 조회 (Phase 7 API)
  */
-PatternUpdater.prototype.get = function(operation: string): LegacyPattern | null {
-  return legacyPatterns.get(operation) || null;
+PatternUpdater.prototype.get = function(operation: string): any {
+  const legacy = legacyPatterns.get(operation);
+  if (!legacy) return null;
+
+  // Merge with patternStats for complete data
+  const stats = this.patternStats.get(operation);
+
+  // Merge variations from initial setup and from variationCounts
+  const variationMap = variationCounts.get(operation) || new Map();
+  const mergedVariations = legacy.variations.map(v => ({
+    text: v.text,
+    count: variationMap.get(v.text) || v.count,
+  }));
+
+  // Add new variations that weren't in initial setup
+  for (const [text, count] of variationMap) {
+    if (!mergedVariations.some(v => v.text === text)) {
+      mergedVariations.push({ text, count });
+    }
+  }
+
+  return {
+    id: legacy.id,
+    original: legacy.original,
+    feedback: legacy.feedback,
+    variations: mergedVariations,
+    total_interactions: stats ? stats.totalFeedback : 0,
+    last_feedback: stats ? stats.lastUpdated : null,
+  };
 };
 
 /**
@@ -592,6 +650,9 @@ PatternUpdater.prototype.initializePattern = function(pattern: any): void {
       modificationRate: 0,
       avgAccuracy: pattern.confidence || 0.5,
       lastUpdated: Date.now(),
+      approvedCount: 0,
+      rejectedCount: 0,
+      modifiedCount: 0,
     });
   }
 };
@@ -615,7 +676,7 @@ PatternUpdater.prototype.recordApproval = function(
     legacyPatterns.set(operation, pattern);
   }
   pattern.feedback.approved++;
-  pattern.original.confidence = Math.min(1, pattern.original.confidence + 0.02);
+  pattern.original.confidence = Math.min(0.98, pattern.original.confidence + 0.02);
 
   // 변형 카운트
   if (keyword) {
@@ -632,15 +693,24 @@ PatternUpdater.prototype.recordApproval = function(
     this.patternStats.set(operation, {
       operation,
       totalFeedback: 1,
-      approvalRate: 0.9,
+      approvalRate: 1.0,
       rejectionRate: 0,
       modificationRate: 0,
-      avgAccuracy: 0.9,
+      avgAccuracy: 1.0,
       lastUpdated: Date.now(),
+      approvedCount: 1,
+      rejectedCount: 0,
+      modifiedCount: 0,
     });
   } else {
-    stats.approvalRate = Math.min(1, stats.approvalRate + 0.05);
+    stats.approvedCount = (stats.approvedCount || 0) + 1;
     stats.totalFeedback++;
+    // Recalculate rates based on counts
+    const total = stats.approvedCount + (stats.rejectedCount || 0) + (stats.modifiedCount || 0);
+    stats.approvalRate = total > 0 ? stats.approvedCount / total : 1.0;
+    stats.rejectionRate = total > 0 ? (stats.rejectedCount || 0) / total : 0;
+    stats.modificationRate = total > 0 ? (stats.modifiedCount || 0) / total : 0;
+    stats.lastUpdated = Date.now();
   }
 };
 
@@ -659,6 +729,8 @@ PatternUpdater.prototype.recordRejection = function(operation: string): void {
     legacyPatterns.set(operation, pattern);
   }
   pattern.feedback.rejected++;
+  // Decrease confidence on rejection (5%)
+  pattern.original.confidence = Math.max(0.5, pattern.original.confidence * 0.95);
 
   const stats = this.patternStats.get(operation);
   if (!stats) {
@@ -666,14 +738,23 @@ PatternUpdater.prototype.recordRejection = function(operation: string): void {
       operation,
       totalFeedback: 1,
       approvalRate: 0,
-      rejectionRate: 0.9,
+      rejectionRate: 1.0,
       modificationRate: 0,
-      avgAccuracy: 0.1,
+      avgAccuracy: 0,
       lastUpdated: Date.now(),
+      approvedCount: 0,
+      rejectedCount: 1,
+      modifiedCount: 0,
     });
   } else {
-    stats.rejectionRate = Math.min(1, stats.rejectionRate + 0.1);
+    stats.rejectedCount = (stats.rejectedCount || 0) + 1;
     stats.totalFeedback++;
+    // Recalculate rates based on counts
+    const total = (stats.approvedCount || 0) + stats.rejectedCount + (stats.modifiedCount || 0);
+    stats.approvalRate = total > 0 ? (stats.approvedCount || 0) / total : 0;
+    stats.rejectionRate = total > 0 ? stats.rejectedCount / total : 1.0;
+    stats.modificationRate = total > 0 ? (stats.modifiedCount || 0) / total : 0;
+    stats.lastUpdated = Date.now();
   }
 };
 
@@ -696,6 +777,28 @@ PatternUpdater.prototype.recordModification = function(
   }
   pattern.feedback.modified++;
 
+  // Update description if provided in modification
+  if (modification && modification.description) {
+    pattern.original.description = modification.description;
+  }
+
+  // Add examples/variations if provided
+  if (modification && modification.examples && Array.isArray(modification.examples)) {
+    for (const example of modification.examples) {
+      if (!pattern.variations.some(v => v.text === example)) {
+        pattern.variations.push({ text: example, count: 0 });
+      }
+    }
+  } else if (modification && modification.example) {
+    // Backward compatibility for singular 'example'
+    if (!pattern.variations.some(v => v.text === modification.example)) {
+      pattern.variations.push({ text: modification.example, count: 0 });
+    }
+  }
+
+  // Decrease confidence on modification (2%)
+  pattern.original.confidence = Math.max(0.5, pattern.original.confidence * 0.98);
+
   const stats = this.patternStats.get(operation);
   if (!stats) {
     this.patternStats.set(operation, {
@@ -703,13 +806,22 @@ PatternUpdater.prototype.recordModification = function(
       totalFeedback: 1,
       approvalRate: 0,
       rejectionRate: 0,
-      modificationRate: 0.8,
+      modificationRate: 1.0,
       avgAccuracy: 0.5,
       lastUpdated: Date.now(),
+      approvedCount: 0,
+      rejectedCount: 0,
+      modifiedCount: 1,
     });
   } else {
-    stats.modificationRate = Math.min(1, stats.modificationRate + 0.05);
+    stats.modifiedCount = (stats.modifiedCount || 0) + 1;
     stats.totalFeedback++;
+    // Recalculate rates based on counts
+    const total = (stats.approvedCount || 0) + (stats.rejectedCount || 0) + stats.modifiedCount;
+    stats.approvalRate = total > 0 ? (stats.approvedCount || 0) / total : 0;
+    stats.rejectionRate = total > 0 ? (stats.rejectedCount || 0) / total : 0;
+    stats.modificationRate = total > 0 ? stats.modifiedCount / total : 1.0;
+    stats.lastUpdated = Date.now();
   }
 };
 

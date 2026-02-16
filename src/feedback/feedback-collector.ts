@@ -223,6 +223,35 @@ export class FeedbackCollector {
   }
 
   /**
+   * 호환성: 세션 ID 조회 (이전 API)
+   */
+  getSessionId(): string {
+    return this.sessionId;
+  }
+
+  /**
+   * 호환성: 세션별 피드백 조회 (이전 API)
+   * 참고: FeedbackCollector는 세션별로 피드백을 관리하지 않으므로, 빈 배열 반환
+   */
+  getFeedbacksBySession(sessionId: string): any[] {
+    // Week 4에서는 FeedbackStorage에서 관리
+    // 호환성을 위해 빈 배열 반환
+    return [];
+  }
+
+  /**
+   * 호환성: 세션별 통계 (이전 API)
+   */
+  getStatsBySession(sessionId: string): any {
+    return {
+      total: 0,
+      approved: 0,
+      rejected: 0,
+      modified: 0,
+    };
+  }
+
+  /**
    * 세션 ID 생성
    * @private
    */

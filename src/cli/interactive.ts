@@ -7,7 +7,7 @@
 
 import { autocompleteDB } from '../engine/autocomplete-db';
 import { feedbackCollector } from '../feedback/collector';
-// import { patternUpdater } from '../learning/pattern-updater'; // Deprecated: use PatternUpdater class
+import { patternUpdater } from '../learning/pattern-updater';
 import { dashboard } from '../dashboard/dashboard';
 
 export interface CLICommand {

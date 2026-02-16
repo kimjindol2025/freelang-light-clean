@@ -6,7 +6,7 @@
  */
 
 import { feedbackCollector, UserFeedback } from '../feedback/collector';
-import { PatternUpdater } from './pattern-updater';
+import { PatternUpdater, patternUpdater } from './pattern-updater';
 import { autocompleteDB, AutocompleteDB } from '../engine/autocomplete-db';
 
 export interface ImproveMetrics {
@@ -106,7 +106,12 @@ export class AutoImprover {
       this.syncAutocompleteDB(improvablePatterns);
 
       // 5️⃣ 메트릭 계산
-      const stats = feedbackCollector.getStatsBySession(sessionId);
+      // Week 4에서는 feedbacks를 이미 가지고 있으므로, 직접 계산
+      const totalFeedbacks = feedbacks.length;
+      const approvedCount = feedbacks.filter(f => f.user_action === 'approve').length;
+      const rejectedCount = feedbacks.filter(f => f.user_action === 'reject').length;
+      const modifiedCount = feedbacks.filter(f => f.user_action === 'modify').length;
+
       const confidenceAfter = this.calculateAvgConfidence(
         improvablePatterns.map(p => p.id)
       );
@@ -116,10 +121,10 @@ export class AutoImprover {
           : 0;
 
       const metrics: ImproveMetrics = {
-        total_feedbacks: stats.total,
-        approved_count: stats.approved,
-        rejected_count: stats.rejected,
-        modified_count: stats.modified,
+        total_feedbacks: totalFeedbacks,
+        approved_count: approvedCount,
+        rejected_count: rejectedCount,
+        modified_count: modifiedCount,
         improved_patterns: improvablePatterns.map(p => p.id),
         avg_confidence_before: confidentBefore,
         avg_confidence_after: confidenceAfter,
@@ -164,9 +169,9 @@ export class AutoImprover {
       this.improvementThreshold
     );
 
-    return patterns.filter(p =>
-      needsImprovement.some(ni => ni.id === p.id)
-    );
+    // getNeedsImprovement()는 문자열 배열 반환
+    const needsSet = new Set(needsImprovement);
+    return patterns.filter(p => needsSet.has(p.id));
   }
 
   /**
