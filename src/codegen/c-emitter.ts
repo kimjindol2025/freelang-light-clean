@@ -42,11 +42,20 @@ export class CEmitter {
    * 함수 시그니처 생성
    */
   private generateSignature(proposal: HeaderProposal): string {
-    const cReturnType = this.mapType(proposal.output);
     const cInputType = this.mapType(proposal.input);
     const paramName = this.getParamName(proposal.input);
 
-    // 배열 처리: 포인터 + 길이
+    // 배열 반환 함수: void로 변경 (제자리 수정)
+    if (proposal.output.startsWith('array<')) {
+      if (proposal.input.startsWith('array<')) {
+        return `void ${proposal.fn}(${cInputType}* ${paramName}, int len) {`;
+      } else {
+        return `void ${proposal.fn}(${cInputType} ${paramName}) {`;
+      }
+    }
+
+    // 단일 값 반환 함수: 원래 타입 유지
+    const cReturnType = this.mapType(proposal.output);
     if (proposal.input.startsWith('array<')) {
       return `${cReturnType} ${proposal.fn}(${cInputType}* ${paramName}, int len) {`;
     } else {
@@ -132,8 +141,7 @@ export class CEmitter {
     ${resultType} tmp = ${arrName}[i];
     ${arrName}[i] = ${arrName}[j];
     ${arrName}[j] = tmp;
-  }
-  return ${arrName};`;
+  }`;
   }
 
   private generateSort(arrName: string, resultType: string): string {
@@ -144,23 +152,20 @@ export class CEmitter {
         ${resultType} tmp = ${arrName}[j];
         ${arrName}[j] = ${arrName}[j + 1];
         ${arrName}[j + 1] = tmp;
-      }
-  return ${arrName};`;
+      }`;
   }
 
   private generateFilter(arrName: string, resultType: string): string {
     return `// Simple filter: keep all non-zero
   int j = 0;
   for (int i = 0; i < len; i++)
-    if (${arrName}[i] != 0) ${arrName}[j++] = ${arrName}[i];
-  return ${arrName};`;
+    if (${arrName}[i] != 0) ${arrName}[j++] = ${arrName}[i];`;
   }
 
   private generateMap(arrName: string, resultType: string): string {
     return `// Simple map: multiply by 2
   for (int i = 0; i < len; i++)
-    ${arrName}[i] *= 2;
-  return ${arrName};`;
+    ${arrName}[i] *= 2;`;
   }
 
   private generateIdentity(paramName: string, resultType: string): string {
