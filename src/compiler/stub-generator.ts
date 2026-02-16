@@ -47,6 +47,13 @@ export interface Warning {
 }
 
 /**
+ * Factory function to create StubGenerator
+ */
+export function createStubGenerator(config?: Partial<StubGeneratorConfig>): StubGenerator {
+  return new StubGenerator(config);
+}
+
+/**
  * Stub Generator: Fills incomplete code with type-aware stubs
  */
 export class StubGenerator {
@@ -113,7 +120,24 @@ export class StubGenerator {
   }
 
   /**
-   * Get appropriate stub value for a type
+   * Get appropriate stub value for a type (public method for testing)
+   */
+  public generateStubForType(type: string): string {
+    if (!this.config.defaultValue) return 'null';
+
+    const lowerType = type.toLowerCase();
+
+    if (lowerType === 'number') return '0';
+    if (lowerType === 'string') return '""';
+    if (lowerType.startsWith('array') || lowerType === 'list') return '[]';
+    if (lowerType === 'bool' || lowerType === 'boolean') return 'false';
+    if (lowerType === 'void') return '// empty';
+
+    return 'null';
+  }
+
+  /**
+   * Get appropriate stub value for a type (internal use)
    */
   private getStubForType(type: string): any {
     if (!this.config.defaultValue) return null;
@@ -133,6 +157,31 @@ export class StubGenerator {
       default:
         return null;
     }
+  }
+
+  /**
+   * Complete an incomplete expression by adding appropriate stub value
+   */
+  public completeExpression(expr: string, expectedType: string): string {
+    const trimmed = expr.trim();
+
+    // If ends with operator, add stub
+    if (['+', '-', '*', '/', '='].some(op => trimmed.endsWith(op))) {
+      const stub = this.generateStubForType(expectedType);
+      return expr + stub;
+    }
+
+    // If ends with parenthesis, add closing one
+    if (trimmed.endsWith('(')) {
+      return expr + ')';
+    }
+
+    // If ends with array bracket, add closing one
+    if (trimmed.endsWith('[')) {
+      return expr + ']';
+    }
+
+    return expr;
   }
 
   /**
@@ -199,5 +248,13 @@ export class StubGenerator {
    */
   public getStubs(): Stub[] {
     return this.stubs;
+  }
+
+  /**
+   * Reset state
+   */
+  public reset(): void {
+    this.stubs = [];
+    this.warnings = [];
   }
 }
