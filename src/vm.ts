@@ -512,6 +512,37 @@ export class VM {
     };
   }
 
+  // ── Callback Management (Phase 16-17) ──
+  registerCallback(bytecode: Inst[]): number {
+    const id = this.nextCallbackId++;
+    this.callbackRegistry.set(id, bytecode);
+    return id;
+  }
+
+  executeCallback(callbackId: number, _args?: any[]): VMResult {
+    const bytecode = this.callbackRegistry.get(callbackId);
+    if (!bytecode) {
+      return this.fail(Op.HALT, 1, `callback_not_found:${callbackId}`);
+    }
+
+    // Execute callback bytecode in isolated context
+    const savedStack = this.stack;
+    const savedVars = this.vars;
+    const savedPc = this.pc;
+
+    this.stack = [];
+    this.vars = new Map();
+    this.pc = 0;
+
+    const result = this.run(bytecode);
+
+    this.stack = savedStack;
+    this.vars = savedVars;
+    this.pc = savedPc;
+
+    return result;
+  }
+
   // ── State inspection (for AI) ──
   getStack(): readonly unknown[] { return this.stack; }
   getVar(name: string): unknown { return this.vars.get(name); }
