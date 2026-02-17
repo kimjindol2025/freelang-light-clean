@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 /**
  * Phase 9.1: CLI Entry Point
  *
