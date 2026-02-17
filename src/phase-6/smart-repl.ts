@@ -904,6 +904,34 @@ export class SmartREPL {
         log: console.log,
         stringify: (v: any) => JSON.stringify(v, null, 2),
         parse: (s: string) => JSON.parse(s),
+
+        // ==================== Phase 13: HTTP Client ====================
+        http: {
+          get: async (url: string) => {
+            const { HttpWrapper } = await import('../engine/http-wrapper');
+            return await HttpWrapper.get(url);
+          },
+          post: async (url: string, body: string) => {
+            const { HttpWrapper } = await import('../engine/http-wrapper');
+            return await HttpWrapper.post(url, body);
+          },
+          json_get: async (url: string) => {
+            const { HttpWrapper } = await import('../engine/http-wrapper');
+            return await HttpWrapper.getJSON(url);
+          },
+          json_post: async (url: string, data: any) => {
+            const { HttpWrapper } = await import('../engine/http-wrapper');
+            return await HttpWrapper.postJSON(url, data);
+          },
+          head: async (url: string) => {
+            const { HttpWrapper } = await import('../engine/http-wrapper');
+            return await HttpWrapper.head(url);
+          },
+          patch: async (url: string, body: string) => {
+            const { HttpWrapper } = await import('../engine/http-wrapper');
+            return await HttpWrapper.patch(url, body);
+          },
+        },
       },
     };
   }
