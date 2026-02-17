@@ -13,6 +13,8 @@ export class VM {
   private pc = 0;
   private cycles = 0;
   private callStack: number[] = [];  // for CALL/RET
+  private callbackRegistry: Map<number, Inst[]> = new Map();  // callback_id -> bytecode
+  private nextCallbackId = 0;
 
   run(program: Inst[]): VMResult {
     this.stack = [];

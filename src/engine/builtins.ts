@@ -351,6 +351,87 @@ export const BUILTINS: Record<string, BuiltinSpec> = {
       );
     },
   },
+
+  // ────────────────────────────────────────
+  // Timer API (Phase 16)
+  // ────────────────────────────────────────
+
+  timer_create: {
+    name: 'timer_create',
+    params: [],
+    return_type: 'number',  // timer_id
+    c_name: 'freelang_timer_create',
+    headers: ['freelang_ffi.h', 'uv.h'],
+    impl: () => {
+      // Fallback: return a unique ID
+      return Math.floor(Math.random() * 1000000);
+    },
+  },
+
+  timer_start: {
+    name: 'timer_start',
+    params: [
+      { name: 'timer_id', type: 'number' },
+      { name: 'timeout_ms', type: 'number' },
+      { name: 'callback_id', type: 'number' },
+      { name: 'repeat', type: 'number' },
+    ],
+    return_type: 'number',  // 0 on success, -1 on error
+    c_name: 'freelang_timer_start',
+    headers: ['freelang_ffi.h', 'uv.h'],
+    impl: (timerId: number, timeoutMs: number, callbackId: number, repeat: number) => {
+      // Fallback: simulated timer
+      return 0;
+    },
+  },
+
+  timer_stop: {
+    name: 'timer_stop',
+    params: [{ name: 'timer_id', type: 'number' }],
+    return_type: 'void',
+    c_name: 'freelang_timer_stop',
+    headers: ['freelang_ffi.h', 'uv.h'],
+    impl: (timerId: number) => {
+      // Stub
+    },
+  },
+
+  timer_close: {
+    name: 'timer_close',
+    params: [{ name: 'timer_id', type: 'number' }],
+    return_type: 'void',
+    c_name: 'freelang_timer_close',
+    headers: ['freelang_ffi.h', 'uv.h'],
+    impl: (timerId: number) => {
+      // Stub
+    },
+  },
+
+  // ────────────────────────────────────────
+  // Event Loop Control (Phase 16-17)
+  // ────────────────────────────────────────
+
+  event_loop_run: {
+    name: 'event_loop_run',
+    params: [{ name: 'timeout_ms', type: 'number' }],
+    return_type: 'void',
+    c_name: 'freelang_event_loop_run',
+    headers: ['freelang_ffi.h', 'uv.h'],
+    impl: (timeoutMs: number) => {
+      // Stub: In real implementation, runs the libuv event loop
+    },
+  },
+
+  event_loop_stop: {
+    name: 'event_loop_stop',
+    params: [],
+    return_type: 'void',
+    c_name: 'freelang_event_loop_stop',
+    headers: ['freelang_ffi.h', 'uv.h'],
+    impl: () => {
+      // Stub
+    },
+  },
 };
 
 // ────────────────────────────────────────

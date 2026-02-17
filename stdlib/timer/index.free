@@ -1,0 +1,94 @@
+/**
+ * FreeLang Timer Module (Phase 16)
+ * Provides set_interval, set_timeout, clear_interval, clear_timeout
+ */
+
+// Callback registry: stores FreeLang functions by ID
+let callback_registry = [];
+let next_callback_id = 0;
+
+fn register_callback(fn) => {
+  let id = next_callback_id;
+  next_callback_id = next_callback_id + 1;
+  callback_registry[id] = fn;
+  return id;
+};
+
+fn unregister_callback(id) => {
+  callback_registry[id] = null;
+};
+
+fn invoke_callback(id) => {
+  if (id >= 0 && id < callback_registry.length) {
+    let fn = callback_registry[id];
+    if (fn != null) {
+      fn();
+    }
+  }
+};
+
+// ────────────────────────────────────────
+// Public API
+// ────────────────────────────────────────
+
+export fn set_timeout(ms, fn) => {
+  let callback_id = register_callback(fn);
+  let timer_id = timer_create();
+
+  if (timer_id < 0) {
+    unregister_callback(callback_id);
+    return -1;
+  }
+
+  let ret = timer_start(timer_id, ms, callback_id, 0);  // 0 = one-shot
+
+  if (ret != 0) {
+    timer_close(timer_id);
+    unregister_callback(callback_id);
+    return -1;
+  }
+
+  return timer_id;
+};
+
+export fn set_interval(ms, fn) => {
+  let callback_id = register_callback(fn);
+  let timer_id = timer_create();
+
+  if (timer_id < 0) {
+    unregister_callback(callback_id);
+    return -1;
+  }
+
+  let ret = timer_start(timer_id, ms, callback_id, 1);  // 1 = repeat
+
+  if (ret != 0) {
+    timer_close(timer_id);
+    unregister_callback(callback_id);
+    return -1;
+  }
+
+  return timer_id;
+};
+
+export fn clear_timeout(timer_id) => {
+  timer_stop(timer_id);
+  timer_close(timer_id);
+};
+
+export fn clear_interval(timer_id) => {
+  timer_stop(timer_id);
+  timer_close(timer_id);
+};
+
+// ────────────────────────────────────────
+// Event Loop Control
+// ────────────────────────────────────────
+
+export fn loop_run() => {
+  event_loop_run(0);
+};
+
+export fn loop_stop() => {
+  event_loop_stop();
+};
