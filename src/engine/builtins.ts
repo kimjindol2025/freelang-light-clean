@@ -591,7 +591,7 @@ export const BUILTINS: Record<string, BuiltinSpec> = {
     return_type: 'thread_handle',
     c_name: 'freelang_spawn_thread',
     headers: ['freelang_ffi.h', 'uv.h'],
-    impl: async (fn: Function) => {
+    impl: async (fn: any) => {
       try {
         const { createRealThreadManager } = await import('../phase-12/thread-manager');
         const manager = createRealThreadManager();

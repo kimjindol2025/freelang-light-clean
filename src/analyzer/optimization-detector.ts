@@ -377,6 +377,14 @@ export class OptimizationDetector {
       [Op.CHAR_NEW]: 'CHAR_NEW',
       [Op.CHAR_CODE]: 'CHAR_CODE',
       [Op.CHAR_FROM]: 'CHAR_FROM',
+      [Op.SPAWN_THREAD]: 'SPAWN_THREAD',
+      [Op.JOIN_THREAD]: 'JOIN_THREAD',
+      [Op.MUTEX_CREATE]: 'MUTEX_CREATE',
+      [Op.MUTEX_LOCK]: 'MUTEX_LOCK',
+      [Op.MUTEX_UNLOCK]: 'MUTEX_UNLOCK',
+      [Op.CHANNEL_CREATE]: 'CHANNEL_CREATE',
+      [Op.CHANNEL_SEND]: 'CHANNEL_SEND',
+      [Op.CHANNEL_RECV]: 'CHANNEL_RECV',
       [Op.DUMP]: 'DUMP',
     };
 
