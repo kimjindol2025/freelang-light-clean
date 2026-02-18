@@ -122,6 +122,40 @@ export interface LambdaExpression {
 }
 
 /**
+ * Phase 4 Step 1: Module System - Import/Export Support
+ * Enables multi-file projects with type-safe imports and exports
+ */
+
+// Import specifier (what to import)
+export interface ImportSpecifier {
+  name: string;               // Original export name in source module
+  alias?: string;             // Renamed as (optional)
+}
+
+// Import statement
+export interface ImportStatement {
+  type: 'import';
+  imports: ImportSpecifier[];  // Named imports
+  from: string;                // Module path (relative or absolute)
+  isNamespace?: boolean;       // import * as name
+  namespace?: string;          // Namespace name if isNamespace
+}
+
+// Export statement
+export interface ExportStatement {
+  type: 'export';
+  declaration: FunctionStatement | VariableDeclaration;  // What to export
+}
+
+// Module (top-level container for a .fl file)
+export interface Module {
+  path: string;                // File path or module name
+  imports: ImportStatement[];  // Import statements at top
+  exports: ExportStatement[];  // Export statements
+  statements: Statement[];     // Other statements (functions, variables, etc.)
+}
+
+/**
  * Phase 15: Pattern Matching
  * Rust 스타일의 match 표현식 지원
  */
@@ -181,7 +215,9 @@ export type Statement =
   | ForOfStatement  // Phase 2: for...of loop support
   | WhileStatement
   | ReturnStatement
-  | BlockStatement;
+  | BlockStatement
+  | ImportStatement  // Phase 4: Module System
+  | ExportStatement; // Phase 4: Module System
 
 export interface ExpressionStatement {
   type: 'expression';

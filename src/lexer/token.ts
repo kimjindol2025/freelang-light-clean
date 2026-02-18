@@ -4,7 +4,7 @@
  * v1에서 복사된 기본 토큰 타입들 + minimal .free 포맷용 3개 토큰 추가
  */
 export enum TokenType {
-  // Keywords (29개 - v1 기본)
+  // Keywords (30개 - v1 기본 + Phase 4 추가 1개)
   FN = 'FN',
   LET = 'LET',
   CONST = 'CONST',
@@ -21,6 +21,7 @@ export enum TokenType {
   AWAIT = 'AWAIT',
   IMPORT = 'IMPORT',
   EXPORT = 'EXPORT',
+  FROM = 'FROM',  // Phase 4: Module System - from keyword for imports
   STRUCT = 'STRUCT',
   ENUM = 'ENUM',
   TRAIT = 'TRAIT',
@@ -123,7 +124,7 @@ export interface Token {
 }
 
 /**
- * Keywords map (v1 기본 29개 + Phase 5 추가 3개 = 32개)
+ * Keywords map (v1 기본 29개 + Phase 4 추가 1개 + Phase 5 추가 3개 = 33개)
  */
 export const KEYWORDS: Record<string, TokenType> = {
   // v1 기본
@@ -143,6 +144,7 @@ export const KEYWORDS: Record<string, TokenType> = {
   'await': TokenType.AWAIT,
   'import': TokenType.IMPORT,
   'export': TokenType.EXPORT,
+  'from': TokenType.FROM,  // Phase 4: Module System
   'struct': TokenType.STRUCT,
   'enum': TokenType.ENUM,
   'trait': TokenType.TRAIT,
