@@ -9,13 +9,14 @@
 
 // Base Compiler
 export {
-  IntegratedCompilerBase,
   CompileTarget,
   CompilerConfig,
   CompilationStage,
   CompilationResult,
   ASTNode,
 } from './compiler-base/integrated-compiler-base';
+
+export { default as IntegratedCompilerBase } from './compiler-base/integrated-compiler-base';
 
 // Compiler Variants
 export {
@@ -28,12 +29,12 @@ export {
   LLVMCompiler,
   JITCompiler,
   AOTCompiler,
-  CompilerFactory,
 } from './variants/compiler-variants';
 
-// Re-exports
-export { default as IntegratedCompilerBase } from './compiler-base/integrated-compiler-base';
 export { default as CompilerFactory } from './variants/compiler-variants';
+
+// Import for convenience functions
+import CompilerFactory from './variants/compiler-variants';
 
 /**
  * Convenience function to compile with any target

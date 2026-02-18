@@ -9,7 +9,6 @@
 
 // Cryptographic Module
 export {
-  CryptoModule,
   HashAlgorithm,
   CipherAlgorithm,
   KeyFormat,
@@ -21,9 +20,10 @@ export {
   SignatureResult,
 } from './crypto/crypto-module';
 
+export { default as CryptoModule } from './crypto/crypto-module';
+
 // Memory Safety Module
 export {
-  MemorySafetyModule,
   BufferCheckResult,
   MemoryAllocation,
   UseAfterFreeCheck,
@@ -31,17 +31,20 @@ export {
   MemoryLeakReport,
 } from './memory-safety/memory-safety';
 
+export { default as MemorySafetyModule } from './memory-safety/memory-safety';
+
 // Input Validator
 export {
-  InputValidator,
   ValidationResult,
   SanitizedData,
 } from './input-validation/input-validator';
 
-// Re-export defaults
-export { default as CryptoModule } from './crypto/crypto-module';
-export { default as MemorySafetyModule } from './memory-safety/memory-safety';
 export { default as InputValidator } from './input-validation/input-validator';
+
+// Import for SecuritySuite
+import CryptoModule from './crypto/crypto-module';
+import MemorySafetyModule from './memory-safety/memory-safety';
+import InputValidator from './input-validation/input-validator';
 
 /**
  * Security Suite
