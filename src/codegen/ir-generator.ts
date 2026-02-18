@@ -6,14 +6,26 @@
  */
 
 import { Inst, Op, AIIntent } from '../types';
+import { Module, ImportStatement, ExportStatement, FunctionStatement, VariableDeclaration } from '../parser/ast';
 
 export interface ASTNode {
   type: string;
   [key: string]: any;
 }
 
+/**
+ * Phase 4 Step 5: Module linking context
+ * 모듈 간 심볼 연결을 위한 컨텍스트
+ */
+export interface ModuleLinkContext {
+  importedSymbols: Map<string, string>;  // 심볼명 → 임포트 경로
+  exportedSymbols: Map<string, string>;  // 심볼명 → 타입
+  moduleResolver?: any;                   // ModuleResolver 인스턴스
+}
+
 export class IRGenerator {
   private indexVarCounter = 0;  // For generating unique index variables
+  private moduleLinkContext?: ModuleLinkContext;  // Phase 4 Step 5: Module linking
 
   /**
    * AST → IR instructions
@@ -31,6 +43,173 @@ export class IRGenerator {
     this.traverse(ast, instructions);
     instructions.push({ op: Op.HALT });
     return instructions;
+  }
+
+  /**
+   * Phase 4 Step 5: Module IR 생성
+   *
+   * 모듈 전체를 IR로 변환:
+   * 1. Import 심볼 바인딩
+   * 2. Export 심볼 수집
+   * 3. 모듈 본체 IR 생성
+   *
+   * @param module 파싱된 Module
+   * @returns Module IR 지시사항
+   */
+  public generateModuleIR(module: Module): Inst[] {
+    const instructions: Inst[] = [];
+
+    // Step 1: Import 컨텍스트 구축
+    this.moduleLinkContext = {
+      importedSymbols: new Map(),
+      exportedSymbols: new Map()
+    };
+
+    // Step 2: Import 처리 - 심볼 바인딩
+    for (const importStmt of module.imports) {
+      this.generateImportIR(importStmt, instructions);
+    }
+
+    // Step 3: Export 심볼 수집
+    for (const exportStmt of module.exports) {
+      this.collectExportedSymbol(exportStmt);
+    }
+
+    // Step 4: 모듈 본체 IR 생성
+    for (const stmt of module.statements) {
+      this.traverse(stmt, instructions);
+    }
+
+    // Step 5: HALT 추가
+    instructions.push({ op: Op.HALT });
+
+    return instructions;
+  }
+
+  /**
+   * Phase 4 Step 5: Import 문의 IR 생성
+   *
+   * Import 심볼을 IR에서 사용 가능하도록 바인딩
+   *
+   * @param importStmt Import 문
+   * @param out IR 지시사항 배열
+   */
+  private generateImportIR(importStmt: ImportStatement, out: Inst[]): void {
+    // 임포트된 각 심볼을 컨텍스트에 등록
+    if (importStmt.isNamespace && importStmt.namespace) {
+      // import * as math from "./math.fl"
+      // → math.add, math.multiply 등을 바인딩
+
+      // Note: 실제 바인딩은 Module Resolver가 처리
+      // 여기서는 로드 지시사항만 생성
+      out.push({
+        op: Op.COMMENT,  // 주석 같은 메타데이터 (구현 가능)
+        arg: `Namespace import: ${importStmt.namespace} from ${importStmt.from}`
+      } as any);
+
+      if (this.moduleLinkContext) {
+        this.moduleLinkContext.importedSymbols.set(
+          importStmt.namespace,
+          importStmt.from
+        );
+      }
+    } else {
+      // import { add, multiply } from "./math.fl"
+      // → add, multiply를 바인딩
+      for (const spec of importStmt.imports) {
+        const bindName = spec.alias || spec.name;
+
+        out.push({
+          op: Op.COMMENT,
+          arg: `Import: ${spec.name} as ${bindName} from ${importStmt.from}`
+        } as any);
+
+        if (this.moduleLinkContext) {
+          this.moduleLinkContext.importedSymbols.set(
+            bindName,
+            `${importStmt.from}#${spec.name}`
+          );
+        }
+      }
+    }
+  }
+
+  /**
+   * Phase 4 Step 5: Export된 심볼 수집
+   *
+   * @param exportStmt Export 문
+   */
+  private collectExportedSymbol(exportStmt: ExportStatement): void {
+    if (!this.moduleLinkContext) return;
+
+    const decl = exportStmt.declaration;
+    if (decl.type === 'function') {
+      const fn = decl as FunctionStatement;
+      this.moduleLinkContext.exportedSymbols.set(
+        fn.name,
+        'function'
+      );
+    } else if (decl.type === 'variable') {
+      const varDecl = decl as VariableDeclaration;
+      this.moduleLinkContext.exportedSymbols.set(
+        varDecl.name,
+        varDecl.varType || 'unknown'
+      );
+    }
+  }
+
+  /**
+   * Phase 4 Step 5: Module 링크 컨텍스트 설정
+   *
+   * @param context Module linking context
+   */
+  public setModuleLinkContext(context: ModuleLinkContext): void {
+    this.moduleLinkContext = context;
+  }
+
+  /**
+   * Phase 4 Step 5: 임포트된 심볼인지 확인
+   *
+   * @param name 심볼명
+   * @returns 임포트된 심볼이면 true
+   */
+  private isImportedSymbol(name: string): boolean {
+    return this.moduleLinkContext?.importedSymbols.has(name) ?? false;
+  }
+
+  /**
+   * Phase 4 Step 5: Export된 심볼인지 확인
+   *
+   * @param name 심볼명
+   * @returns Export된 심볼이면 true
+   */
+  private isExportedSymbol(name: string): boolean {
+    return this.moduleLinkContext?.exportedSymbols.has(name) ?? false;
+  }
+
+  /**
+   * Phase 4 Step 5: Module 문맥에서 함수 호출명 해석
+   *
+   * 예:
+   * - math.add → ./math.fl#add
+   * - add → add (로컬 함수)
+   *
+   * @param callee 함수명 (로컬 또는 qualified)
+   * @returns 해석된 함수명
+   */
+  private resolveCalleeForModule(callee: string): string {
+    // Qualified name 처리 (math.add 형태)
+    if (callee.includes('.')) {
+      const [namespace, funcName] = callee.split('.');
+      if (this.moduleLinkContext?.importedSymbols.has(namespace)) {
+        // namespace가 import된 namespace인 경우
+        const modulePath = this.moduleLinkContext.importedSymbols.get(namespace);
+        return `${modulePath}#${funcName}`;
+      }
+    }
+
+    // 로컬 함수
+    return callee;
   }
 
   /**
@@ -188,7 +367,11 @@ export class IRGenerator {
             this.traverse(arg, out);
           }
         }
-        out.push({ op: Op.CALL, arg: node.callee, sub: [] });
+
+        // Phase 4 Step 5: Cross-module function call support
+        // 예: math.add(1, 2) → qualified name으로 처리
+        const calleeNameWithContext = this.resolveCalleeForModule(node.callee);
+        out.push({ op: Op.CALL, arg: calleeNameWithContext, sub: [] });
         break;
 
       // ── Range/Iterator (Lazy Evaluation) ─────────────────────
@@ -311,6 +494,37 @@ export class IRGenerator {
 
         // Evaluate arguments and generate method-specific IR
         this.generateMethodCallIR(node.method, node.args, methodObjVar, out);
+        break;
+
+      // ── Phase 4 Step 5: Import Statement ───────────────────────
+      case 'import':
+      case 'ImportStatement':
+        // Import는 컨텍스트에서 처리됨
+        // IR 지시사항은 이미 generateImportIR에서 생성됨
+        break;
+
+      // ── Phase 4 Step 5: Export Statement ───────────────────────
+      case 'export':
+      case 'ExportStatement':
+        // Export는 선언만 처리 (함수나 변수 선언)
+        const exportStmt = node as ExportStatement;
+        this.traverse(exportStmt.declaration, out);
+        break;
+
+      // ── Function Statement (from Phase 4 Step 5) ─────────────────
+      case 'function':
+      case 'FunctionStatement':
+        // 함수 선언: FUNC_DEF 지시사항 생성
+        const fn = node as FunctionStatement;
+        const funcBody: Inst[] = [];
+        if (fn.body) {
+          this.traverse(fn.body, funcBody);
+        }
+        out.push({
+          op: Op.FUNC_DEF,
+          arg: fn.name,
+          sub: funcBody
+        });
         break;
 
       // ── Default (unknown node type) ─────────────────────────
