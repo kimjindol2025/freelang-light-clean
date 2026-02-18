@@ -12,9 +12,11 @@ export { StatementCompiler } from './statement-compiler';
 export { TypeInferenceCompiler } from './type-inference-compiler';
 export { GenericsCompiler } from './generics-compiler';
 
-// Placeholder exports for future compilers
-export { ExpressionCompiler as AsyncCompiler } from './expression-compiler';
-export { StatementCompiler as PatternMatchCompiler } from './statement-compiler';
-export { ExpressionCompiler as TraitCompiler } from './expression-compiler';
-export { StatementCompiler as FFICompiler } from './statement-compiler';
-export { ExpressionCompiler as OptimizationCompiler } from './expression-compiler';
+// Phase 3: Advanced Features
+export { AsyncCompiler } from './async-compiler';
+export { PatternMatchCompiler } from './pattern-match-compiler';
+export { TraitCompiler } from './trait-compiler';
+
+// Phase 4: Integration & Optimization
+export { FFICompiler } from './ffi-compiler';
+export { OptimizationCompiler } from './optimization-compiler';
