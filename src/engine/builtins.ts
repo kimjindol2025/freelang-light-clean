@@ -580,6 +580,195 @@ export const BUILTINS: Record<string, BuiltinSpec> = {
       return 0;
     },
   },
+
+  // ────────────────────────────────────────
+  // SQLite3 FFI Bindings (Phase 1C - FFI Activation)
+  // ────────────────────────────────────────
+  // Register native SQLite functions for database access
+  // Compiled from stdlib/core/sqlite_binding.c
+  // Linked as libfreelang_sqlite.so
+
+  native_sqlite_open: {
+    name: 'native_sqlite_open',
+    params: [{ name: 'path', type: 'string' }],
+    return_type: 'object',
+    c_name: 'fl_sqlite_open',
+    headers: ['sqlite_binding.h', 'sqlite3.h'],
+    impl: (path: string) => {
+      // Fallback: In-memory mock database connection
+      return {
+        path: path,
+        handle: Math.floor(Math.random() * 1000000),
+        isOpen: true,
+        lastError: null,
+      };
+    },
+  },
+
+  native_sqlite_close: {
+    name: 'native_sqlite_close',
+    params: [{ name: 'conn', type: 'object' }],
+    return_type: 'number',
+    c_name: 'fl_sqlite_close',
+    headers: ['sqlite_binding.h', 'sqlite3.h'],
+    impl: (conn: any) => {
+      // Fallback: Mark connection as closed
+      if (conn) conn.isOpen = false;
+      return 0;  // SQLITE_OK
+    },
+  },
+
+  native_sqlite_execute: {
+    name: 'native_sqlite_execute',
+    params: [
+      { name: 'conn', type: 'object' },
+      { name: 'query', type: 'string' },
+    ],
+    return_type: 'object',
+    c_name: 'fl_sqlite_execute',
+    headers: ['sqlite_binding.h', 'sqlite3.h'],
+    impl: (conn: any, query: string) => {
+      // Fallback: Return empty result set
+      return {
+        columns: [],
+        rows: [],
+        rowCount: 0,
+        lastInsertRowid: 0,
+      };
+    },
+  },
+
+  native_sqlite_execute_update: {
+    name: 'native_sqlite_execute_update',
+    params: [
+      { name: 'conn', type: 'object' },
+      { name: 'query', type: 'string' },
+    ],
+    return_type: 'number',
+    c_name: 'fl_sqlite_execute_update',
+    headers: ['sqlite_binding.h', 'sqlite3.h'],
+    impl: (conn: any, query: string) => {
+      // Fallback: Return number of affected rows
+      return 0;
+    },
+  },
+
+  native_sqlite_fetch_row: {
+    name: 'native_sqlite_fetch_row',
+    params: [{ name: 'result', type: 'object' }],
+    return_type: 'number',
+    c_name: 'fl_sqlite_fetch_row',
+    headers: ['sqlite_binding.h', 'sqlite3.h'],
+    impl: (result: any) => {
+      // Fallback: Return SQLITE_DONE (no more rows)
+      return 101;  // SQLITE_DONE
+    },
+  },
+
+  native_sqlite_get_column_text: {
+    name: 'native_sqlite_get_column_text',
+    params: [
+      { name: 'result', type: 'object' },
+      { name: 'idx', type: 'number' },
+    ],
+    return_type: 'string',
+    c_name: 'fl_sqlite_get_column_text',
+    headers: ['sqlite_binding.h', 'sqlite3.h'],
+    impl: (result: any, idx: number) => {
+      // Fallback: Return empty string
+      return '';
+    },
+  },
+
+  native_sqlite_get_column_int: {
+    name: 'native_sqlite_get_column_int',
+    params: [
+      { name: 'result', type: 'object' },
+      { name: 'idx', type: 'number' },
+    ],
+    return_type: 'number',
+    c_name: 'fl_sqlite_get_column_int',
+    headers: ['sqlite_binding.h', 'sqlite3.h'],
+    impl: (result: any, idx: number) => {
+      // Fallback: Return 0
+      return 0;
+    },
+  },
+
+  native_sqlite_get_column_double: {
+    name: 'native_sqlite_get_column_double',
+    params: [
+      { name: 'result', type: 'object' },
+      { name: 'idx', type: 'number' },
+    ],
+    return_type: 'number',
+    c_name: 'fl_sqlite_get_column_double',
+    headers: ['sqlite_binding.h', 'sqlite3.h'],
+    impl: (result: any, idx: number) => {
+      // Fallback: Return 0.0
+      return 0.0;
+    },
+  },
+
+  native_sqlite_get_error: {
+    name: 'native_sqlite_get_error',
+    params: [{ name: 'conn', type: 'object' }],
+    return_type: 'string',
+    c_name: 'fl_sqlite_get_error',
+    headers: ['sqlite_binding.h', 'sqlite3.h'],
+    impl: (conn: any) => {
+      // Fallback: Return error from connection
+      return conn?.lastError || 'no error';
+    },
+  },
+
+  native_sqlite_get_error_code: {
+    name: 'native_sqlite_get_error_code',
+    params: [{ name: 'conn', type: 'object' }],
+    return_type: 'number',
+    c_name: 'fl_sqlite_get_error_code',
+    headers: ['sqlite_binding.h', 'sqlite3.h'],
+    impl: (conn: any) => {
+      // Fallback: Return SQLITE_OK
+      return 0;  // SQLITE_OK
+    },
+  },
+
+  native_sqlite_begin: {
+    name: 'native_sqlite_begin',
+    params: [{ name: 'conn', type: 'object' }],
+    return_type: 'number',
+    c_name: 'fl_sqlite_begin',
+    headers: ['sqlite_binding.h', 'sqlite3.h'],
+    impl: (conn: any) => {
+      // Fallback: Return success
+      return 0;  // SQLITE_OK
+    },
+  },
+
+  native_sqlite_commit: {
+    name: 'native_sqlite_commit',
+    params: [{ name: 'conn', type: 'object' }],
+    return_type: 'number',
+    c_name: 'fl_sqlite_commit',
+    headers: ['sqlite_binding.h', 'sqlite3.h'],
+    impl: (conn: any) => {
+      // Fallback: Return success
+      return 0;  // SQLITE_OK
+    },
+  },
+
+  native_sqlite_rollback: {
+    name: 'native_sqlite_rollback',
+    params: [{ name: 'conn', type: 'object' }],
+    return_type: 'number',
+    c_name: 'fl_sqlite_rollback',
+    headers: ['sqlite_binding.h', 'sqlite3.h'],
+    impl: (conn: any) => {
+      // Fallback: Return success
+      return 0;  // SQLITE_OK
+    },
+  },
 };
 
 // ────────────────────────────────────────
