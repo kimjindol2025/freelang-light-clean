@@ -71,7 +71,7 @@ $(BIN_DIR)/test_hashmap: $(BUILD_DIR)/syscall.o $(BUILD_DIR)/memory.o $(BUILD_DI
 $(BIN_DIR)/test_io: $(BUILD_DIR)/syscall.o $(BUILD_DIR)/io.o $(BUILD_DIR)/test_io.o
 	$(CC) $(LDFLAGS) -o $@ $^
 
-test: $(BIN_DIR)/test_memory $(BIN_DIR)/test_string $(BIN_DIR)/test_array $(BIN_DIR)/test_hashmap
+test: $(BIN_DIR)/test_memory $(BIN_DIR)/test_string $(BIN_DIR)/test_array $(BIN_DIR)/test_hashmap $(BIN_DIR)/test_io
 	@echo "╔════════════════════════════════════════╗"
 	@echo "║  MyOS_Lib Phase 8.1 Memory Tests      ║"
 	@echo "╚════════════════════════════════════════╝"
@@ -95,6 +95,12 @@ test: $(BIN_DIR)/test_memory $(BIN_DIR)/test_string $(BIN_DIR)/test_array $(BIN_
 	@echo "╚════════════════════════════════════════╝"
 	@echo ""
 	@$(BIN_DIR)/test_hashmap
+	@echo ""
+	@echo "╔════════════════════════════════════════╗"
+	@echo "║  MyOS_Lib Phase 8.5 IO Tests          ║"
+	@echo "╚════════════════════════════════════════╝"
+	@echo ""
+	@$(BIN_DIR)/test_io
 	@echo ""
 
 clean:
