@@ -101,6 +101,20 @@ export enum Op {
   CHANNEL_SEND = 0xB6,   // channel_send(channel, message)
   CHANNEL_RECV = 0xB7,   // channel_recv(channel, timeout) → message
 
+  // Network (Phase 26 - HTTP 독립)
+  SOCKET_CREATE  = 0xC0, // socket_create() → socket_fd
+  SOCKET_BIND    = 0xC1, // socket_bind(socket_fd, port)
+  SOCKET_LISTEN  = 0xC2, // socket_listen(socket_fd, backlog)
+  TCP_ACCEPT     = 0xC3, // tcp_accept(socket_fd) → client_fd
+  TCP_READ       = 0xC4, // tcp_read(client_fd, size) → buffer
+  TCP_WRITE      = 0xC5, // tcp_write(client_fd, buffer)
+  SOCKET_CLOSE   = 0xC6, // socket_close(fd)
+  HTTP_PARSE     = 0xC7, // http_parse(buffer) → {method, path, headers}
+
+  // Test Framework (Phase 27 - Testing 독립)
+  TEST_ASSERT    = 0xD0, // assert(condition, message)
+  TEST_REPORT    = 0xD1, // report_test_result(name, passed, error)
+
   // Debug (AI reads structured output)
   DUMP      = 0xF0,
 }

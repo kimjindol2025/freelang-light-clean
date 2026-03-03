@@ -8,6 +8,7 @@ import { Iterator, IteratorEngine } from './engine/iterator';
 import { FunctionRegistry, LocalScope } from './parser/function-registry';
 import { FunctionTypeChecker } from './analyzer/type-checker';
 import { TypeParser } from './cli/type-parser';
+import * as net from 'net';
 
 const MAX_CYCLES = 100_000;
 const MAX_STACK  = 10_000;
@@ -33,6 +34,15 @@ export class VM {
   private currentScope?: LocalScope;  // Phase 19: variable scoping
   private typeChecker = new FunctionTypeChecker();  // Phase 21: type-safe execution
   private typeWarnings: TypeWarning[] = [];  // Phase 21: track type warnings
+
+  // ── Network (Phase 26) ──
+  private servers: Map<number, net.Server> = new Map();
+  private clients: Map<number, net.Socket> = new Map();
+  private socketHandleCounter = 1;
+  private pendingBindData: Map<number, { port: number }> = new Map();
+
+  // ── Test Framework (Phase 27) ──
+  private testResults: Array<{ name: string; passed: boolean; error?: string }> = [];
 
   constructor(functionRegistry?: FunctionRegistry) {
     this.functionRegistry = functionRegistry;
@@ -579,6 +589,159 @@ export class VM {
         break;
       }
 
+      // ── Socket Operations (Phase 26) ──
+      case Op.SOCKET_CREATE: {
+        // stack: [] → [handle]
+        const handle = this.socketHandleCounter++;
+        this.guardStack();
+        this.stack.push(handle);
+        this.pc++;
+        break;
+      }
+
+      case Op.SOCKET_BIND: {
+        // stack: [handle, port] → [handle]
+        this.need(2);
+        const port = this.stack.pop() as number;
+        const handle = this.stack.pop() as number;
+        this.pendingBindData.set(handle, { port });
+        this.guardStack();
+        this.stack.push(handle);
+        this.pc++;
+        break;
+      }
+
+      case Op.SOCKET_LISTEN: {
+        // stack: [handle] → [handle]
+        this.need(1);
+        const handle = this.stack[this.stack.length - 1] as number;
+        const bindData = this.pendingBindData.get(handle);
+        if (!bindData) throw new Error('socket_not_bound:' + handle);
+
+        const server = net.createServer();
+        this.servers.set(handle, server);
+        server.listen(bindData.port, '0.0.0.0', () => {
+          // Listening
+        });
+        this.pc++;
+        break;
+      }
+
+      case Op.TCP_ACCEPT: {
+        // stack: [handle] → [client_handle]
+        this.need(1);
+        const handle = this.stack.pop() as number;
+        const server = this.servers.get(handle);
+        if (!server) throw new Error('server_not_found:' + handle);
+
+        // Note: For async accept in sync VM, we use a simplified approach
+        // In production, this would need async/await support
+        const clientHandle = this.socketHandleCounter++;
+        // Placeholder: actual acceptance would be async
+        this.guardStack();
+        this.stack.push(clientHandle);
+        this.pc++;
+        break;
+      }
+
+      case Op.TCP_READ: {
+        // stack: [client_fd, size] → [buffer]
+        this.need(2);
+        const size = this.stack.pop() as number;
+        const clientHandle = this.stack.pop() as number;
+        const client = this.clients.get(clientHandle);
+        if (!client) throw new Error('client_not_found:' + clientHandle);
+
+        // Placeholder: would be async in real implementation
+        this.guardStack();
+        this.stack.push(''); // Empty buffer placeholder
+        this.pc++;
+        break;
+      }
+
+      case Op.TCP_WRITE: {
+        // stack: [client_fd, buffer] → []
+        this.need(2);
+        const buffer = this.stack.pop();
+        const clientHandle = this.stack.pop() as number;
+        const client = this.clients.get(clientHandle);
+        if (!client) throw new Error('client_not_found:' + clientHandle);
+
+        if (typeof buffer === 'string') {
+          client.write(buffer);
+        }
+        this.pc++;
+        break;
+      }
+
+      case Op.SOCKET_CLOSE: {
+        // stack: [fd] → []
+        this.need(1);
+        const fd = this.stack.pop() as number;
+        const server = this.servers.get(fd);
+        const client = this.clients.get(fd);
+
+        if (server) {
+          server.close();
+          this.servers.delete(fd);
+        } else if (client) {
+          client.destroy();
+          this.clients.delete(fd);
+        } else {
+          throw new Error('fd_not_found:' + fd);
+        }
+        this.pc++;
+        break;
+      }
+
+      case Op.HTTP_PARSE: {
+        // stack: [buffer] → [parsed_http_object]
+        this.need(1);
+        const buffer = this.stack.pop() as string;
+        const lines = buffer.split('\r\n');
+        if (lines.length < 1) throw new Error('invalid_http');
+
+        const [method, path, version] = lines[0].split(' ');
+        // Simplified HTTP parsing - returns method + path for now
+        this.guardStack();
+        this.stack.push(method);
+        this.guardStack();
+        this.stack.push(path);
+        this.pc++;
+        break;
+      }
+
+      // ── Test Framework (Phase 27) ──
+      case Op.TEST_ASSERT: {
+        // stack: [condition, message] → []
+        this.need(2);
+        const message = this.stack.pop();
+        const condition = this.stack.pop();
+
+        const passed = condition ? true : false;
+        this.testResults.push({
+          name: typeof message === 'string' ? message : 'test',
+          passed,
+          error: passed ? undefined : 'assertion_failed'
+        });
+        this.pc++;
+        break;
+      }
+
+      case Op.TEST_REPORT: {
+        // stack: [name, passed] → []
+        this.need(2);
+        const passed = this.stack.pop();
+        const name = this.stack.pop();
+
+        this.testResults.push({
+          name: typeof name === 'string' ? name : 'test',
+          passed: passed ? true : false
+        });
+        this.pc++;
+        break;
+      }
+
       // ── Debug ──
       case Op.DUMP:
         // AI reads this programmatically, no console.log
@@ -722,4 +885,18 @@ export class VM {
   getStack(): readonly unknown[] { return this.stack; }
   getVar(name: string): unknown { return this.vars.get(name); }
   getVarNames(): string[] { return [...this.vars.keys()]; }
+
+  // ── Test inspection ──
+  getTestResults() {
+    return {
+      total: this.testResults.length,
+      passed: this.testResults.filter(r => r.passed).length,
+      failed: this.testResults.filter(r => !r.passed).length,
+      results: this.testResults
+    };
+  }
+
+  clearTestResults(): void {
+    this.testResults = [];
+  }
 }

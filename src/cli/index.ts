@@ -12,6 +12,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { interactiveMode } from './interactive';
 import { batchMode } from './batch';
+import { ProgramRunner } from './runner';
+import { ScriptRunner } from '../script-runner';
 
 /**
  * 도움말 표시
@@ -22,12 +24,16 @@ function showUsage(): void {
 
 Usage:
   freelang                    # 대화형 모드 (기본값)
+  freelang run <file.fl>      # 스크립트 실행 (v4 Lexer/Parser/VM)
   freelang --interactive      # 명시적 대화형 모드
   freelang --batch <file>     # 배치 모드 (파일 입력)
   freelang --help             # 도움말
   freelang --version          # 버전 정보
 
 Options:
+  run <file.fl>              # FreeLang 스크립트 실행
+  --no-check                 # 타입 체크 건너뛰기
+  --dump-bc                  # 바이트코드 덤프
   -i, --interactive          # 대화형 모드 시작
   -b, --batch <file>         # 배치 파일 입력 (입력값 한 줄씩)
   -o, --output <file>        # 출력 파일 (배치 모드)
@@ -36,6 +42,10 @@ Options:
   -v, --version              # 버전
 
 Examples:
+  # 스크립트 실행
+  $ freelang run hello.fl
+  $ freelang run vm-db-test.fl --no-check
+
   # 대화형 모드
   $ freelang
 
@@ -221,6 +231,35 @@ async function main(): Promise<void> {
     return;
   }
 
+  // run 명령어 처리 (최우선)
+  if (args[0] === 'run') {
+    const filePath = args[1];
+    if (!filePath) {
+      console.error('❌ run requires a file argument');
+      showUsage();
+      process.exit(1);
+    }
+
+    const noCheck = args.includes('--no-check');
+    const dumpBc = args.includes('--dump-bc');
+
+    const result = ScriptRunner.runFile(filePath, {
+      noCheck,
+      dumpBc,
+      filePath
+    });
+
+    for (const line of result.output) {
+      console.log(line);
+    }
+
+    if (result.error) {
+      console.error(result.error);
+      process.exit(result.exitCode);
+    }
+    process.exit(0);
+  }
+
   // 인자 파싱
   let mode: 'interactive' | 'batch' = 'interactive';
   let batchInputFile: string | undefined;
@@ -277,9 +316,29 @@ async function main(): Promise<void> {
         break;
 
       default:
-        console.error(`❌ Unknown option: ${arg}`);
-        showUsage();
-        process.exit(1);
+        // .free 파일 직접 실행 지원
+        if (!arg.startsWith('-') && arg.endsWith('.free')) {
+          try {
+            const runner = new ProgramRunner();
+            const result = runner.runFile(arg);
+            if (result.success) {
+              if (result.output !== undefined) {
+                console.log(result.output);
+              }
+              process.exit(0);
+            } else {
+              console.error(`❌ ${result.error}`);
+              process.exit(result.exitCode);
+            }
+          } catch (error) {
+            console.error(`❌ Failed to run ${arg}:`, error instanceof Error ? error.message : String(error));
+            process.exit(1);
+          }
+        } else {
+          console.error(`❌ Unknown option: ${arg}`);
+          showUsage();
+          process.exit(1);
+        }
     }
   }
 

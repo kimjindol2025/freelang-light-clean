@@ -24,6 +24,9 @@ export * as set from './set';
 export * as map from './map';
 export * as encoding from './encoding';
 
+// Re-export Phase 3 modules
+export * as test from './test';
+
 /**
  * Standard Library namespace
  *
@@ -61,6 +64,7 @@ import * as dateModule from './date';
 import * as setModule from './set';
 import * as mapModule from './map';
 import * as encodingModule from './encoding';
+import * as testModule from './test';
 
 const std = {
   // Phase 1 modules
@@ -75,7 +79,9 @@ const std = {
   date: dateModule,
   set: setModule,
   map: mapModule,
-  encoding: encodingModule
+  encoding: encodingModule,
+  // Phase 3 modules
+  test: testModule
 };
 
 export default std;

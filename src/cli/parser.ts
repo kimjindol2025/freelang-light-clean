@@ -27,7 +27,8 @@ export class FunctionParser {
     const functions: ParsedFunction[] = [];
 
     // Find all fn keyword positions
-    const fnPattern = /fn\s+(\w+)\s*\((.*?)\)\s*\{/g;
+    // Pattern allows type annotations like "-> void" between ) and {
+    const fnPattern = /fn\s+(\w+)\s*\(([^)]*)\)[^{]*\{/g;
     let match;
 
     while ((match = fnPattern.exec(source)) !== null) {

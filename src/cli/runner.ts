@@ -10,6 +10,7 @@ import { VM } from '../vm';
 import { FunctionRegistry } from '../parser/function-registry';
 import { FunctionParser } from './parser';
 import { Inst, VMResult } from '../types';
+import { parseFreeLangExpression } from '../parser/pratt';
 
 export interface RunResult {
   success: boolean;
@@ -20,63 +21,32 @@ export interface RunResult {
 }
 
 /**
- * Simple parser to convert string to AST
- * For now, returns mock AST based on patterns
+ * Remove comments from source code
+ */
+function removeComments(source: string): string {
+  // Remove single-line comments (// ...)
+  let result = source.replace(/\/\/.*$/gm, '');
+  // Remove multi-line comments (/* ... */)
+  result = result.replace(/\/\*[\s\S]*?\*\//g, '');
+  return result;
+}
+
+/**
+ * Parse FreeLang source code - extract statements after function definitions
+ * Uses Pratt Parser for proper operator precedence handling
  */
 function parseProgram(source: string): Record<string, any> {
-  // For Day 6, we implement basic parsing for simple expressions
-  // Real parser would be in parser module
+  // Remove comments to avoid parsing errors
+  const clean = removeComments(source);
+  const trimmed = clean.trim();
 
-  // Trim and check basic patterns
-  const trimmed = source.trim();
-
-  // Pattern 1: Simple number
-  if (/^\d+$/.test(trimmed)) {
-    return {
-      type: 'NumberLiteral',
-      value: parseInt(trimmed, 10)
-    };
+  if (!trimmed) {
+    throw new Error('Empty program');
   }
 
-  // Pattern 2: String literal
-  if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
-    return {
-      type: 'StringLiteral',
-      value: trimmed.slice(1, -1)
-    };
-  }
-
-  // Pattern 3: Simple addition (e.g., "5 + 3")
-  const addMatch = trimmed.match(/^(\d+)\s*\+\s*(\d+)$/);
-  if (addMatch) {
-    return {
-      type: 'BinaryOp',
-      operator: '+',
-      left: { type: 'NumberLiteral', value: parseInt(addMatch[1], 10) },
-      right: { type: 'NumberLiteral', value: parseInt(addMatch[2], 10) }
-    };
-  }
-
-  // Pattern 4: String concatenation
-  const strConcatMatch = trimmed.match(/^"([^"]*)"\s*\+\s*"([^"]*)"$/);
-  if (strConcatMatch) {
-    return {
-      type: 'BinaryOp',
-      operator: '+',
-      left: { type: 'StringLiteral', value: strConcatMatch[1] },
-      right: { type: 'StringLiteral', value: strConcatMatch[2] }
-    };
-  }
-
-  // Default: treat as variable identifier or error
-  if (/^[a-zA-Z_]\w*$/.test(trimmed)) {
-    return {
-      type: 'Identifier',
-      name: trimmed
-    };
-  }
-
-  throw new Error(`Unable to parse program: ${trimmed}`);
+  // Use Pratt Parser for expression parsing
+  const expr = parseFreeLangExpression(trimmed);
+  return expr;
 }
 
 /**
@@ -113,34 +83,85 @@ export class ProgramRunner {
       // 2. Clear previous functions and register new ones
       this.registry.clear();
       for (const fnDef of parsed.functionDefs) {
-        // Convert parsed function to AST form for registry
+        // Register function with body stored as source code
+        // The VM will interpret the body when function is called
         this.registry.register({
           type: 'FunctionDefinition',
           name: fnDef.name,
           params: fnDef.params,
-          body: parseProgram(fnDef.body) as any
+          body: fnDef.body as any  // Store body as raw source, not parsed
         });
       }
 
-      // 3. Parse statements (source without functions)
-      // For now, simple implementation: parse the entire source
-      const ast = parseProgram(source) as any;
+      // 3. Parse statements (non-function statements)
+      // For now, find all statements outside of function definitions
+      // Simple approach: Look for statements that are NOT "fn ...{...}"
 
-      // 4. Generate IR
-      const ir = this.gen.generateIR(ast);
+      let statementsOnly = removeComments(source);
 
-      // 5. Execute on VM
-      const result = this.vm.run(ir);
+      // Find all function boundaries and remove them
+      // Sort by position (descending) so we can remove from end to start
+      const fnPositions: Array<{start: number; end: number}> = [];
 
-      const executionTime = Date.now() - startTime;
+      for (const fnDef of parsed.functionDefs) {
+        const fnKeywordIndex = statementsOnly.indexOf(`fn ${fnDef.name}`);
+        if (fnKeywordIndex === -1) continue;
 
-      return {
-        success: result.ok,
-        output: result.value,
-        error: result.error ? `VM Error: ${result.error.detail}` : undefined,
-        exitCode: result.ok ? 0 : 1,
-        executionTime
-      };
+        // Find the opening brace
+        let braceStart = statementsOnly.indexOf('{', fnKeywordIndex);
+        if (braceStart === -1) continue;
+
+        // Find matching closing brace
+        let braceCount = 1;
+        let braceEnd = braceStart + 1;
+        while (braceEnd < statementsOnly.length && braceCount > 0) {
+          if (statementsOnly[braceEnd] === '{') braceCount++;
+          else if (statementsOnly[braceEnd] === '}') braceCount--;
+          braceEnd++;
+        }
+
+        fnPositions.push({
+          start: fnKeywordIndex,
+          end: braceEnd
+        });
+      }
+
+      // Remove functions in reverse order
+      fnPositions.sort((a, b) => b.start - a.start);
+      for (const pos of fnPositions) {
+        statementsOnly = statementsOnly.substring(0, pos.start) + ' ' + statementsOnly.substring(pos.end);
+      }
+
+      statementsOnly = statementsOnly.trim();
+
+      // If there are statements, parse and execute them
+      if (statementsOnly) {
+        const ast = parseProgram(statementsOnly) as any;
+
+        // 4. Generate IR
+        const ir = this.gen.generateIR(ast);
+
+        // 5. Execute on VM
+        const result = this.vm.run(ir);
+
+        const executionTime = Date.now() - startTime;
+
+        return {
+          success: result.ok,
+          output: result.value,
+          error: result.error ? `VM Error: ${result.error.detail}` : undefined,
+          exitCode: result.ok ? 0 : 1,
+          executionTime
+        };
+      } else {
+        // No statements to execute, just return success
+        return {
+          success: true,
+          output: undefined,
+          exitCode: 0,
+          executionTime: Date.now() - startTime
+        };
+      }
     } catch (error) {
       const executionTime = Date.now() - startTime;
 
