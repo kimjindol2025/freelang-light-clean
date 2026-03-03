@@ -13,6 +13,7 @@ import { Inst, Op, VMResult } from '../types';
 import { runADCE } from './adce';
 import { runConstantFolding } from './constant-folding';
 import { runInlining, FreeLangFunction } from './inlining';
+import { optimizeCSE } from './cse';
 
 export interface OptimizationStats {
   deadCodeRemoved: number;
@@ -108,6 +109,14 @@ export class LLVMOptimizerPipeline implements LLVMOptimizer {
 
       inlineTimeMs = performance.now() - inlineStart;
     }
+
+    // ========================================================================
+    // Pass 4: Common Subexpression Elimination (CSE)
+    // ========================================================================
+
+    const cseStart = performance.now();
+    current = optimizeCSE(current);
+    const cseTimeMs = performance.now() - cseStart;
 
     stats.totalInstructionsAfter = current.length;
     stats.executionTimeMs = performance.now() - startTime;
