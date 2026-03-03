@@ -403,6 +403,10 @@ export class OptimizationDetector {
       [Op.OBJ_NEW]: 'OBJ_NEW',
       [Op.OBJ_SET]: 'OBJ_SET',
       [Op.OBJ_GET]: 'OBJ_GET',
+      [Op.TRY_START]: 'TRY_START',
+      [Op.CATCH_START]: 'CATCH_START',
+      [Op.CATCH_END]: 'CATCH_END',
+      [Op.THROW]: 'THROW',
       [Op.DUMP]: 'DUMP',
     };
 

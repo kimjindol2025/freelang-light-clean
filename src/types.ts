@@ -117,6 +117,12 @@ export enum Op {
   OBJ_SET   = 0xC1,  // Set property: arg: "varname:key" → set varname[key] = stack_value
   OBJ_GET   = 0xC2,  // Get property: stack: [obj, key] → [value]
 
+  // Exception Handling (Phase I - try-catch)
+  TRY_START = 0xD0,  // Start try block: arg: catch_offset (jump target if error)
+  CATCH_START = 0xD1,  // Start catch block: arg: varname (error variable)
+  CATCH_END = 0xD2,  // End catch block
+  THROW = 0xD3,      // Throw error: arg: error_message
+
   // Debug (AI reads structured output)
   DUMP      = 0xF0,
 }

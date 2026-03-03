@@ -334,13 +334,20 @@ export class IRGenerator {
 
       // ── Unary Operations ────────────────────────────────────
       case 'UnaryOp':
-        this.traverse(node.operand, out);
-        if (node.operator === '-') {
-          out.push({ op: Op.NEG });
-        } else if (node.operator === '!') {
-          out.push({ op: Op.NOT });
+      case 'unary':
+        if (node.operator === 'typeof') {
+          // typeof is a function call: typeof(argument)
+          this.traverse(node.argument, out);
+          out.push({ op: Op.CALL, arg: 'typeof' });
         } else {
-          throw new Error(`Unknown unary operator: ${node.operator}`);
+          this.traverse(node.argument || node.operand, out);
+          if (node.operator === '-') {
+            out.push({ op: Op.NEG });
+          } else if (node.operator === '!') {
+            out.push({ op: Op.NOT });
+          } else {
+            throw new Error(`Unknown unary operator: ${node.operator}`);
+          }
         }
         break;
 
@@ -715,6 +722,80 @@ export class IRGenerator {
           out.push({ op: Op.PUSH, arg: 0 });
         }
         out.push({ op: Op.RET });
+        break;
+
+      // ── Try-Catch-Finally Statement (Phase I) ───────────────
+      case 'TryStatement':
+      case 'try':
+        {
+          // Structure:
+          // TRY_START catch_offset
+          // [try body]
+          // JMP finally_or_end
+          // [catch blocks]
+          // [finally block]
+          // ...
+
+          const tryStartIdx = out.length;
+          out.push({ op: Op.TRY_START, arg: 0 }); // Patch catch offset later
+
+          // Generate try body
+          if (node.body && node.body.body) {
+            for (const stmt of node.body.body) {
+              this.traverse(stmt, out);
+            }
+          }
+
+          // Jump over catch blocks (if they exist)
+          const jumpOverCatchIdx = out.length;
+          out.push({ op: Op.JMP, arg: 0 }); // Patch offset later
+
+          // Patch try_start to point to catch block
+          const catchBlockStart = out.length;
+          out[tryStartIdx].arg = catchBlockStart;
+
+          // Generate catch blocks
+          if (node.catchClauses && node.catchClauses.length > 0) {
+            for (const catchClause of node.catchClauses) {
+              // CATCH_START with error variable name
+              out.push({
+                op: Op.CATCH_START,
+                arg: catchClause.parameter || '_error'
+              });
+
+              // Generate catch body
+              if (catchClause.body && catchClause.body.body) {
+                for (const stmt of catchClause.body.body) {
+                  this.traverse(stmt, out);
+                }
+              }
+
+              // CATCH_END (marks end of catch block)
+              out.push({ op: Op.CATCH_END });
+            }
+          }
+
+          // Patch jump-over-catch to point to finally (or end)
+          out[jumpOverCatchIdx].arg = out.length;
+
+          // Generate finally block if it exists
+          if (node.finallyBody && node.finallyBody.body) {
+            for (const stmt of node.finallyBody.body) {
+              this.traverse(stmt, out);
+            }
+          }
+        }
+        break;
+
+      // ── Throw Statement (Phase I) ────────────────────────────
+      case 'ThrowStatement':
+      case 'throw':
+        {
+          // Evaluate the expression (usually a string or variable)
+          this.traverse(node.argument, out);
+          // Throw the error
+          out.push({ op: Op.THROW });
+        }
         break;
 
       // ── Default (unknown node type) ─────────────────────────

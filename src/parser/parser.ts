@@ -62,7 +62,10 @@ import {
   ImportSpecifier,  // Phase 4 Step 2: Module System
   ExportStatement,  // Phase 4 Step 2: Module System
   FunctionStatement,  // Phase 4 Step 2: Function exports
-  Module  // Phase 1: Full program parsing
+  Module,  // Phase 1: Full program parsing
+  TryStatement,  // Phase I: Exception Handling
+  CatchClause,   // Phase I: Exception Handling
+  ThrowStatement  // Phase I: Exception Handling
 } from './ast';
 
 /**
@@ -713,6 +716,17 @@ export class Parser {
   private parsePrimaryExpression(): Expression {
     const token = this.current();
 
+    // typeof operator (unary)
+    if (token.value === 'typeof') {
+      this.advance(); // consume 'typeof'
+      const argument = this.parsePrimaryExpression(); // Recursively parse the next primary
+      return {
+        type: 'unary',
+        operator: 'typeof',
+        argument
+      } as any;
+    }
+
     // 리터럴 (숫자, 문자열, 불린)
     if (this.check(TokenType.NUMBER)) {
       const value = parseFloat(token.value);
@@ -1232,6 +1246,16 @@ export class Parser {
       return this.parseReturnStatement();
     }
 
+    // Phase I: try 문
+    if (this.check(TokenType.TRY)) {
+      return this.parseTryStatement();
+    }
+
+    // Phase I: throw 문
+    if (this.check(TokenType.THROW)) {
+      return this.parseThrowStatement();
+    }
+
     // 블록 문
     if (this.check(TokenType.LBRACE)) {
       return this.parseBlockStatement();
@@ -1425,6 +1449,89 @@ export class Parser {
 
     return {
       type: 'return',
+      argument
+    };
+  }
+
+  /**
+   * Phase I: Try-Catch-Finally 문 파싱
+   *
+   * 형식:
+   *   try { ... } catch (err) { ... } finally { ... }
+   *   try { ... } catch { ... }
+   *   try { ... } finally { ... }
+   */
+  private parseTryStatement(): TryStatement {
+    this.expect(TokenType.TRY, 'Expected "try"');
+
+    // try 블록 파싱
+    const body = this.parseBlockStatement();
+
+    // catch 블록 파싱 (0개 이상)
+    const catchClauses: CatchClause[] = [];
+    while (this.check(TokenType.CATCH)) {
+      this.advance(); // consume 'catch'
+
+      // Optional: (err) 파라미터
+      let parameter: string | undefined;
+      if (this.check(TokenType.LPAREN)) {
+        this.advance(); // consume '('
+        if (this.check(TokenType.IDENT)) {
+          parameter = this.current().value;
+          this.advance();
+        }
+        this.expect(TokenType.RPAREN, 'Expected ")"');
+      }
+
+      // catch 블록
+      const catchBody = this.parseBlockStatement();
+
+      catchClauses.push({
+        parameter,
+        body: catchBody
+      });
+    }
+
+    // finally 블록 파싱 (선택사항)
+    let finallyBody: BlockStatement | undefined;
+    if (this.check(TokenType.FINALLY)) {
+      this.advance(); // consume 'finally'
+      finallyBody = this.parseBlockStatement();
+    }
+
+    // 최소한 catch 또는 finally는 있어야 함
+    if (catchClauses.length === 0 && !finallyBody) {
+      throw new ParseError(
+        this.current().line,
+        this.current().column,
+        'Try statement must have at least one catch or finally block'
+      );
+    }
+
+    return {
+      type: 'try',
+      body,
+      catchClauses: catchClauses.length > 0 ? catchClauses : undefined,
+      finallyBody
+    };
+  }
+
+  /**
+   * Phase I: Throw 문 파싱
+   *
+   * 형식:
+   *   throw "error message"
+   *   throw error_var
+   */
+  private parseThrowStatement(): ThrowStatement {
+    this.expect(TokenType.THROW, 'Expected "throw"');
+
+    // throw 할 표현식
+    const argument = this.parseExpression();
+    this.match(TokenType.SEMICOLON); // 선택적 세미콜론
+
+    return {
+      type: 'throw',
       argument
     };
   }

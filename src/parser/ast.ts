@@ -218,7 +218,9 @@ export type Statement =
   | ReturnStatement
   | BlockStatement
   | ImportStatement  // Phase 4: Module System
-  | ExportStatement; // Phase 4: Module System
+  | ExportStatement  // Phase 4: Module System
+  | TryStatement    // Phase I: Exception Handling
+  | ThrowStatement; // Phase I: Exception Handling
 
 export interface ExpressionStatement {
   type: 'expression';
@@ -270,6 +272,26 @@ export interface ReturnStatement {
 export interface BlockStatement {
   type: 'block';
   body: Statement[];
+}
+
+// Phase I: Exception Handling - Try Statement
+export interface TryStatement {
+  type: 'try';
+  body: BlockStatement;           // try block
+  catchClauses?: CatchClause[];   // catch blocks (optional, can be multiple)
+  finallyBody?: BlockStatement;   // finally block (optional)
+}
+
+// Phase I: Catch Clause
+export interface CatchClause {
+  parameter?: string;  // Error variable name (e.g., "err" in catch(err))
+  body: BlockStatement;  // catch block body
+}
+
+// Phase I: Throw Statement
+export interface ThrowStatement {
+  type: 'throw';
+  argument: Expression;  // Expression to throw (usually string)
 }
 
 // 함수 (FunctionStatement)

@@ -39,6 +39,12 @@ export enum TokenType {
   SUPER = 'SUPER',
   IMPL = 'IMPL',
 
+  // Phase I: Exception Handling (4개 추가)
+  TRY = 'TRY',           // try block
+  CATCH = 'CATCH',       // catch block
+  THROW = 'THROW',       // throw statement
+  FINALLY = 'FINALLY',   // finally block
+
   // Phase 5 minimal .free 포맷 토큰 (3개 추가)
   INPUT = 'INPUT',       // input: 타입 정의
   OUTPUT = 'OUTPUT',     // output: 타입 정의
@@ -161,6 +167,12 @@ export const KEYWORDS: Record<string, TokenType> = {
   'self': TokenType.SELF,
   'super': TokenType.SUPER,
   'impl': TokenType.IMPL,
+
+  // Phase I: Exception Handling (4개)
+  'try': TokenType.TRY,
+  'catch': TokenType.CATCH,
+  'throw': TokenType.THROW,
+  'finally': TokenType.FINALLY,
 
   // Phase 5 minimal .free 포맷 토큰 (3개)
   'input': TokenType.INPUT,

@@ -39,6 +39,7 @@ export class VM {
   private typeChecker = new FunctionTypeChecker();  // Phase 21: type-safe execution
   private typeWarnings: TypeWarning[] = [];  // Phase 21: track type warnings
   private nativeFunctionRegistry = new NativeFunctionRegistry();  // Phase 3: FFI native functions
+  private tryStack: Array<{ catchOffset: number; errorVar: string }> = [];  // Phase I: Exception handling
 
   constructor(functionRegistry?: FunctionRegistry) {
     this.functionRegistry = functionRegistry;
@@ -120,6 +121,7 @@ export class VM {
     this.pc = 0;
     this.cycles = 0;
     this.callStack = [];
+    this.tryStack = [];  // Phase I: Reset exception stack
     const t0 = performance.now();
 
     try {
@@ -765,6 +767,58 @@ export class VM {
         const code = this.stack[this.stack.length - 1] as number;
         this.stack[this.stack.length - 1] = String.fromCharCode(Math.floor(code));
         this.pc++;
+        break;
+      }
+
+      // ── Exception Handling (Phase I) ──
+      case Op.TRY_START: {
+        // arg: catch block offset
+        // Push try context to tryStack
+        this.tryStack.push({
+          catchOffset: arg as number,
+          errorVar: '_error'  // default error variable name
+        });
+        this.pc++;
+        break;
+      }
+
+      case Op.CATCH_START: {
+        // arg: error variable name
+        // Store the error message in the specified variable
+        if (this.stack.length > 0) {
+          const errorValue = this.stack[this.stack.length - 1];
+          this.vars.set(arg as string, errorValue);
+        }
+        this.pc++;
+        break;
+      }
+
+      case Op.CATCH_END: {
+        // Pop try context from tryStack
+        if (this.tryStack.length > 0) {
+          this.tryStack.pop();
+        }
+        this.pc++;
+        break;
+      }
+
+      case Op.THROW: {
+        // stack: [error_message] → throw error
+        this.need(1);
+        const errorMsg = this.stack.pop();
+
+        // Look for an active try block
+        if (this.tryStack.length > 0) {
+          // Push error to stack for catch block
+          this.guardStack();
+          this.stack.push(errorMsg!);
+          // Jump to catch block
+          const tryContext = this.tryStack[this.tryStack.length - 1];
+          this.pc = tryContext.catchOffset;
+        } else {
+          // No try block, throw JavaScript error
+          throw new Error('uncaught_exception:' + String(errorMsg));
+        }
         break;
       }
 
