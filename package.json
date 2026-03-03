@@ -76,17 +76,34 @@
       "c-backend",
       "freelang",
       "intent-parser",
-      "self-correcting"
+      "self-correcting",
+      "self-hosting",
+      "bytecode-compiler",
+      "stack-vm",
+      "type-system"
     ],
     "entry": "dist/cli/index.js",
     "cli": true,
-    "version": "2.1.0",
+    "version": "2.2.0",
+    "stability": "stable",
     "dependencies": [],
     "exports": {
       "cli": "./dist/cli/index.js",
       "engine": "./dist/engine/auto-header.js",
       "parser": "./dist/parser/parser.js",
+      "compiler": "./dist/script-runner/compiler.js",
+      "vm": "./dist/script-runner/vm.js",
       "dashboard": "./dist/dashboard/dashboard.js"
-    }
+    },
+    "features": [
+      "Self-hosting compiler",
+      "Stack-based bytecode VM",
+      "Advanced type system",
+      "While loops with break/continue",
+      "Struct field mutation",
+      "Recursive functions",
+      "Array operations",
+      "Type inference"
+    ]
   }
 }
