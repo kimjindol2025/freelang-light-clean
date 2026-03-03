@@ -64,8 +64,8 @@ export class ProgramRunner {
 
       // 2.5. Phase 2: Register user-defined functions before execution
       // Extract FunctionStatements from module.statements and register them
-      // DEBUG: Log module structure
-      console.log('[DEBUG] Module statements:', module.statements?.map((s: any) => ({ type: s.type, name: s.name })));
+      // DEBUG: Log module structure (disabled)
+      // console.log('[DEBUG] Module statements:', module.statements?.map((s: any) => ({ type: s.type, name: s.name })));
 
       if (module.statements) {
         for (const stmt of module.statements) {

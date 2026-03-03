@@ -565,17 +565,9 @@ export class IRGenerator {
       // ── Function Statement (from Phase 4 Step 5) ─────────────────
       case 'function':
       case 'FunctionStatement':
-        // 함수 선언: FUNC_DEF 지시사항 생성
-        const fn = node as FunctionStatement;
-        const funcBody: Inst[] = [];
-        if (fn.body) {
-          this.traverse(fn.body, funcBody);
-        }
-        out.push({
-          op: Op.FUNC_DEF,
-          arg: fn.name,
-          sub: funcBody
-        });
+        // Phase 2: Functions are registered at module level (runner.ts)
+        // No need to generate FUNC_DEF IR since registration happens before execution
+        // Just skip the function definition here
         break;
 
       // ── Expression Statement (evaluate and discard result) ────

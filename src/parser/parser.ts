@@ -217,6 +217,13 @@ export class Parser {
     // Parse all statements until EOF
     while (!this.check(TokenType.EOF)) {
       try {
+        // Phase 2: Support fn at top level
+        if (this.check(TokenType.FN)) {
+          const fnStmt = this.parseFunctionDeclaration();
+          statements.push(fnStmt as any);
+          continue;
+        }
+
         const stmt = this.parseStatement();
 
         // Separate imports/exports from other statements
@@ -240,6 +247,46 @@ export class Parser {
       imports,
       exports,
       statements
+    };
+  }
+
+  /**
+   * Phase 2: Parse function declaration at top level
+   *
+   * Format: fn name(param1, param2, ...) { ... }
+   */
+  private parseFunctionDeclaration(): FunctionStatement {
+    this.expect(TokenType.FN);
+
+    // Function name
+    const nameToken = this.expect(TokenType.IDENT, 'Expected function name');
+    const name = nameToken.value;
+
+    // Parameters
+    this.expect(TokenType.LPAREN, 'Expected ( after function name');
+    const params: Parameter[] = [];
+
+    if (!this.check(TokenType.RPAREN)) {
+      do {
+        const paramName = this.expect(TokenType.IDENT, 'Expected parameter name');
+        params.push({
+          name: paramName.value,
+          paramType: undefined  // Type optional
+        });
+      } while (this.match(TokenType.COMMA));
+    }
+
+    this.expect(TokenType.RPAREN, 'Expected ) after parameters');
+
+    // Function body
+    const body = this.parseBlockStatement();
+
+    return {
+      type: 'function',
+      name,
+      params,
+      body,
+      returnType: undefined
     };
   }
 

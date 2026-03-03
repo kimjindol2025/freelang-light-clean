@@ -9,6 +9,7 @@ import { FunctionRegistry, LocalScope } from './parser/function-registry';
 import { FunctionTypeChecker } from './analyzer/type-checker';
 import { TypeParser } from './cli/type-parser';
 import { NativeFunctionRegistry, NativeFunctionConfig } from './vm/native-function-registry';
+import { IRGenerator } from './codegen/ir-generator';
 
 const MAX_CYCLES = 100_000;
 const MAX_STACK  = 10_000;
@@ -396,7 +397,7 @@ export class VM {
           }
 
           // Execute function body (generate IR and run)
-          const gen = new (require('../codegen/ir-generator').IRGenerator)();
+          const gen = new IRGenerator();
           const bodyIR = gen.generateIR(fn.body);
 
           const bodyResult = this.runProgram(bodyIR);
