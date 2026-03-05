@@ -31,10 +31,10 @@
  * length: 토큰의 길이
  */
 struct Token {
-  kind: string,      // "KEYWORD", "IDENT", "NUMBER", "STRING", "OP", "PUNCT", "COMMENT", "EOF"
-  value: string,     // 토큰 값
-  line: int,         // 줄 번호 (1부터 시작)
-  col: int,          // 열 번호 (1부터 시작)
+  kind,      // "KEYWORD", "IDENT", "NUMBER", "STRING", "OP", "PUNCT", "COMMENT", "EOF"
+  value,     // 토큰 값
+  line,         // 줄 번호 (1부터 시작)
+  col,          // 열 번호 (1부터 시작)
   length: int        // 토큰 길이
 }
 
@@ -52,10 +52,10 @@ struct Token {
  * tokens: 수집된 토큰 배열
  */
 struct Lexer {
-  source: string,    // 원본 소스 코드
-  pos: int,          // 현재 위치
-  line: int,         // 현재 줄
-  col: int,          // 현재 열
+  source,    // 원본 소스 코드
+  pos,          // 현재 위치
+  line,         // 현재 줄
+  col,          // 현재 열
   tokens: array      // Token 배열
 }
 
@@ -69,7 +69,7 @@ struct Lexer {
  * source: 입력 코드
  * return: 초기화된 Lexer 구조체
  */
-fn createLexer(source: string) {
+fn createLexer(source) {
   return {
     source: source,
     pos: 0,
@@ -103,7 +103,7 @@ fn current(lexer: Lexer) {
  * offset: 미리볼 위치 (1이면 다음 문자)
  * return: offset 위치의 문자
  */
-fn peek(lexer: Lexer, offset: int) {
+fn peek(lexer: Lexer, offset) {
   let pos = lexer.pos + offset
   if pos >= str.len(lexer.source) {
     return ""
@@ -117,7 +117,7 @@ fn peek(lexer: Lexer, offset: int) {
  * ch: 검사할 문자
  * return: true if 알파벳 또는 _
  */
-fn isAlpha(ch: string) {
+fn isAlpha(ch) {
   let code = str.charCodeAt(ch, 0)
   let isLower = code >= 97 && code <= 122      // a-z
   let isUpper = code >= 65 && code <= 90       // A-Z
@@ -131,7 +131,7 @@ fn isAlpha(ch: string) {
  * ch: 검사할 문자
  * return: true if 0-9
  */
-fn isDigit(ch: string) {
+fn isDigit(ch) {
   let code = str.charCodeAt(ch, 0)
   return code >= 48 && code <= 57
 }
@@ -142,7 +142,7 @@ fn isDigit(ch: string) {
  * ch: 검사할 문자
  * return: true if 알파벳 또는 숫자
  */
-fn isAlphaNumeric(ch: string) {
+fn isAlphaNumeric(ch) {
   return isAlpha(ch) || isDigit(ch)
 }
 
@@ -152,7 +152,7 @@ fn isAlphaNumeric(ch: string) {
  * ch: 검사할 문자
  * return: true if space, tab, newline, carriage return
  */
-fn isWhitespace(ch: string) {
+fn isWhitespace(ch) {
   return ch == " " || ch == "\t" || ch == "\n" || ch == "\r"
 }
 
@@ -162,7 +162,7 @@ fn isWhitespace(ch: string) {
  * ch: 검사할 문자
  * return: true if +, -, *, /, %, =, !, <, >, &, |
  */
-fn isOperator(ch: string) {
+fn isOperator(ch) {
   return ch == "+" || ch == "-" || ch == "*" || ch == "/" || ch == "%" ||
          ch == "=" || ch == "!" || ch == "<" || ch == ">" ||
          ch == "&" || ch == "|" || ch == "^"
@@ -174,7 +174,7 @@ fn isOperator(ch: string) {
  * word: 검사할 단어
  * return: true if FreeLang 키워드
  */
-fn isKeyword(word: string) {
+fn isKeyword(word) {
   let keywords = [
     "fn", "let", "const", "return", "if", "else", "else if",
     "while", "for", "do", "break", "continue", "match",
@@ -198,7 +198,7 @@ fn isKeyword(word: string) {
  * col: 토큰 시작 열
  * return: 없음 (side effect: tokens 배열 수정)
  */
-fn addToken(lexer: Lexer, kind: string, value: string, line: int, col: int) {
+fn addToken(lexer: Lexer, kind, value, line, col) {
   let token = {
     kind: kind,
     value: value,
@@ -288,7 +288,7 @@ fn scanIdentifier(lexer: Lexer) {
  * quote: 따옴표 종류 ("또는 ')
  * return: 없음 (side effect)
  */
-fn scanString(lexer: Lexer, quote: string) {
+fn scanString(lexer: Lexer, quote) {
   let start = lexer.pos
   let line = lexer.line
   let col = lexer.col
@@ -409,7 +409,7 @@ fn scanBlockComment(lexer: Lexer) {
  * ch: 현재 문자
  * return: 없음 (side effect)
  */
-fn scanOperator(lexer: Lexer, ch: string) {
+fn scanOperator(lexer: Lexer, ch) {
   let line = lexer.line
   let col = lexer.col
   let value = ch
@@ -543,7 +543,7 @@ fn nextToken(lexer: Lexer) {
  * source: 입력 소스 코드
  * return: Token 배열
  */
-fn tokenize(source: string) {
+fn tokenize(source) {
   let lexer = createLexer(source)
 
   // 전체 소스 코드 파싱
@@ -567,7 +567,7 @@ fn tokenize(source: string) {
  * tokens: Token 배열
  * return: 없음 (콘솔 출력)
  */
-fn printTokens(tokens: array) {
+fn printTokens(tokens) {
   println("=== Token List ===")
   for token in tokens {
     let info = token.kind + ": '" + token.value + "' "
@@ -585,7 +585,7 @@ fn printTokens(tokens: array) {
  * kind: 필터할 Token 종류
  * return: 필터된 Token 배열
  */
-fn filterTokens(tokens: array, kind: string) {
+fn filterTokens(tokens, kind) {
   let filtered = []
   for token in tokens {
     if token.kind == kind {
@@ -601,7 +601,7 @@ fn filterTokens(tokens: array, kind: string) {
  * tokens: Token 배열
  * return: {kind: count} map
  */
-fn countTokens(tokens: array) {
+fn countTokens(tokens) {
   let counts = {}
   for token in tokens {
     let kind = token.kind
@@ -620,7 +620,7 @@ fn countTokens(tokens: array) {
  * tokens: Token 배열
  * return: "KEYWORD IDENT OP ..." 형태의 문자열
  */
-fn tokenSequence(tokens: array) {
+fn tokenSequence(tokens) {
   let seq = []
   for token in tokens {
     if token.kind != "EOF" {
@@ -636,7 +636,7 @@ fn tokenSequence(tokens: array) {
  * tokens: Token 배열
  * return: true if 마지막 토큰이 EOF
  */
-fn isValidTokenization(tokens: array) {
+fn isValidTokenization(tokens) {
   if arr.len(tokens) == 0 {
     return false
   }
@@ -676,7 +676,7 @@ fn testBasic() {
  */
 fn testComplex() {
   let code = "
-  fn factorial(n: int) {
+  fn factorial(n) {
     if n <= 1 {
       return 1
     }
