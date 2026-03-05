@@ -12,6 +12,10 @@ import { registerMathExtendedFunctions } from './stdlib-math-extended';
 import { registerHttpExtendedFunctions } from './stdlib-http-extended';
 import { registerApiFunctions } from './stdlib-api-functions';
 import { registerTestingFunctions } from './stdlib-testing-functions';
+import { registerDataProcessingFunctions } from './stdlib-data-functions';
+import { registerAnalyticsFunctions } from './stdlib-analytics-functions';
+import { registerIntegrationFunctions } from './stdlib-integration-functions';
+import { registerUtilityFunctions } from './stdlib-utility-functions';
 
 /**
  * stdlib 함수들을 NativeFunctionRegistry에 등록
@@ -2799,6 +2803,30 @@ export function registerStdlibFunctions(registry: NativeFunctionRegistry): void 
   // Test Framework, Assertions, Mocking, Spying
   // ────────────────────────────────────────────────────────────
   registerTestingFunctions(registry);
+
+  // ────────────────────────────────────────────────────────────
+  // Phase F: Data Processing Functions (60개)
+  // CSV/JSON/XML parsing, normalization, validation
+  // ────────────────────────────────────────────────────────────
+  registerDataProcessingFunctions(registry);
+
+  // ────────────────────────────────────────────────────────────
+  // Phase F: Advanced Analytics Functions (60개)
+  // Statistics, ML basics, anomaly detection, visualization
+  // ────────────────────────────────────────────────────────────
+  registerAnalyticsFunctions(registry);
+
+  // ────────────────────────────────────────────────────────────
+  // Phase F: Integration Functions (40개)
+  // Events, queues, caching, rate limiting, webhooks
+  // ────────────────────────────────────────────────────────────
+  registerIntegrationFunctions(registry);
+
+  // ────────────────────────────────────────────────────────────
+  // Phase F: Utility Functions (40개)
+  // Date/time, currency, units, encoding, misc
+  // ────────────────────────────────────────────────────────────
+  registerUtilityFunctions(registry);
 
   // Silent registration (no console output)
 }
