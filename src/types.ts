@@ -117,6 +117,12 @@ export enum Op {
   OBJ_SET   = 0xC1,  // Set property: arg: "varname:key" → set varname[key] = stack_value
   OBJ_GET   = 0xC2,  // Get property: stack: [obj, key] → [value]
 
+  // Struct operations (Phase 16)
+  STRUCT_NEW = 0xC3,   // Create new struct type: arg: struct_name
+  STRUCT_FIELD = 0xC4, // Register struct field: arg: field_name
+  STRUCT_SET_FIELD = 0xC5, // Set field: arg: "structvar:fieldname" → set field value
+  STRUCT_GET_FIELD = 0xC6, // Get field: stack: [struct, fieldname] → [value]
+
   // Exception Handling (Phase I - try-catch)
   TRY_START = 0xD0,  // Start try block: arg: catch_offset (jump target if error)
   CATCH_START = 0xD1,  // Start catch block: arg: varname (error variable)

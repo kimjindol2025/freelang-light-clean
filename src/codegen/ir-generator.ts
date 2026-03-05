@@ -809,6 +809,32 @@ export class IRGenerator {
         }
         break;
 
+      // ── Struct Declaration (Phase 16) ───────────────────────
+      case 'struct':
+      case 'StructDeclaration':
+        {
+          // Struct declaration: store struct metadata in the IR
+          // struct name { field1, field2, ... }
+
+          const structName = node.name;
+          const fields = node.fields || [];
+
+          // Create struct type object
+          out.push({ op: Op.STRUCT_NEW, arg: structName });
+
+          // Register struct fields
+          for (const field of fields) {
+            const fieldName = field.name || field;
+            const fieldType = field.fieldType || 'any';
+
+            out.push({ op: Op.STRUCT_FIELD, arg: fieldName });
+          }
+
+          // Store struct definition
+          out.push({ op: Op.STORE, arg: `__struct_${structName}` });
+        }
+        break;
+
       // ── Default (unknown node type) ─────────────────────────
       default:
         throw new Error(`Unknown AST node type: ${node.type}`);
