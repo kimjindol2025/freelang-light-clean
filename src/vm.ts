@@ -839,9 +839,9 @@ export class VM {
                   funcName, lpTarget, lpMax, lpBackups, lpCompress
                 ]);
               }
-              // 함수 진입 시 info 로그 자동 기록
-              if (this.nativeFunctionRegistry.exists('log_info')) {
-                this.nativeFunctionRegistry.call('log_info', [
+              // 함수 진입 시 info 로그 자동 기록 (ch_log_info: 채널 기반 2-arg)
+              if (this.nativeFunctionRegistry.exists('ch_log_info')) {
+                this.nativeFunctionRegistry.call('ch_log_info', [
                   funcName,
                   `fn ${funcName} called (args=${args.length})`
                 ]);
@@ -1216,6 +1216,15 @@ export class VM {
         }
         break;
       }
+
+      // ── Lambda / Closure Metadata (파서가 클로저 객체로 처리, VM에서 skip) ──
+      case Op.LAMBDA_NEW:
+      case Op.LAMBDA_CAPTURE:
+      case Op.LAMBDA_SET_BODY:
+      case Op.FUNC_DEF:
+      case Op.COMMENT:
+        this.pc++;
+        break;
 
       // ── Debug ──
       case Op.DUMP:

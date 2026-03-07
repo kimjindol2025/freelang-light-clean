@@ -78,6 +78,7 @@ import {
   TestBlock,          // Self-Testing Compiler: 내장 테스트 블록
   AssertStatement,    // Self-Testing Compiler: expect 어서션
   LintConfig,         // Native-Linter: @lint(...) 어노테이션
+  LocalVaultConfig,   // Native-JSON-Vault: @local_vault(...) 설정
   TypeAliasDeclaration,   // Reified-Type-System: type X = A | B
   StaticAssertDeclaration, // Reified-Type-System: @static_assert_size<T, N>
   GenericTypeParam        // Reified-Type-System: 제네릭 타입 파라미터
@@ -423,6 +424,8 @@ export class Parser {
     let lintConfig: LintConfig | undefined;
     let allowOrigins: string[] | undefined;  // Hardware-CORS: @allow_origin(...)
     let cspPolicy: string | undefined;       // Native-CSP-Shield: @csp_policy(...)
+    const validateSchemas: Array<{ name: string; schema: string }> = [];  // Native-Request-Validator: @validate_schema(...)
+    let localVault: LocalVaultConfig | undefined; // Native-JSON-Vault: @local_vault(...)
 
     // Native-Linter: 파일 최상단 @lint 어노테이션 파싱
     // Self-Monitoring Kernel: @monitor 등 기타 어노테이션도 여기서 수집
@@ -527,6 +530,86 @@ export class Parser {
         cspPolicy = policyKv.join(',');
         if (process.env.DEBUG_PARSER) {
           console.log('[PARSER] @csp_policy parsed:', cspPolicy);
+        }
+      } else if (this.check(TokenType.IDENT) && this.current().value === 'validate_schema') {
+        // Native-Request-Validator: @validate_schema(name: "register", schema: "email:string:required|email,password:string:required|min=8|max=32")
+        // → validateSchemas 배열에 { name, schema } push
+        this.advance(); // 'validate_schema' 소비
+        let vsName = '';
+        let vsSchema = '';
+        if (this.check(TokenType.LPAREN)) {
+          this.advance(); // '(' 소비
+          let depth = 1;
+          while (depth > 0 && !this.check(TokenType.EOF)) {
+            if (this.check(TokenType.LPAREN)) { depth++; this.advance(); continue; }
+            if (this.check(TokenType.RPAREN)) { depth--; if (depth === 0) break; this.advance(); continue; }
+            if (this.check(TokenType.IDENT)) {
+              const kw = this.advance().value;
+              if (this.check(TokenType.COLON)) this.advance();
+              if (kw === 'name') {
+                if (this.check(TokenType.STRING)) vsName = String(this.advance().value).replace(/^["']|["']$/g, '');
+                else if (this.check(TokenType.IDENT)) vsName = this.advance().value;
+              } else if (kw === 'schema') {
+                if (this.check(TokenType.STRING)) vsSchema = String(this.advance().value).replace(/^["']|["']$/g, '');
+              }
+            } else if (this.check(TokenType.COMMA)) { this.advance(); } else { this.advance(); }
+          }
+          if (this.check(TokenType.RPAREN)) this.advance(); // ')' 소비
+        }
+        if (vsName && vsSchema) {
+          validateSchemas.push({ name: vsName, schema: vsSchema });
+          if (process.env.DEBUG_PARSER) {
+            console.log('[PARSER] @validate_schema parsed:', vsName, vsSchema);
+          }
+        }
+      } else if (this.check(TokenType.IDENT) && this.current().value === 'local_vault') {
+        // Native-JSON-Vault: @local_vault(path: "./data/config.json", autosave: true)
+        // → LocalVaultConfig { path, autosave, line, column }
+        const vaultAnnotToken = this.current(); // 'local_vault' 토큰 (line/column 추출용)
+        this.advance(); // 'local_vault' 소비
+        let vaultPath = './data/vault.json';
+        let autosave = true;
+        if (this.check(TokenType.LPAREN)) {
+          this.advance(); // '(' 소비
+          let depth = 1;
+          while (depth > 0 && !this.check(TokenType.EOF)) {
+            if (this.check(TokenType.LPAREN)) { depth++; this.advance(); continue; }
+            if (this.check(TokenType.RPAREN)) {
+              depth--;
+              if (depth === 0) break;
+              this.advance(); continue;
+            }
+            if (this.check(TokenType.IDENT)) {
+              const key = this.advance().value;
+              if (this.check(TokenType.COLON)) this.advance();
+              if (key === 'path' && this.check(TokenType.STRING)) {
+                vaultPath = String(this.advance().value).replace(/^["']|["']$/g, '');
+              } else if (key === 'autosave') {
+                if (this.check(TokenType.IDENT)) {
+                  const boolVal = this.advance().value;
+                  autosave = boolVal !== 'false';
+                } else if (this.check(TokenType.NUMBER)) {
+                  autosave = Number(this.advance().value) !== 0;
+                }
+              } else {
+                this.advance(); // unknown key value 스킵
+              }
+            } else if (this.check(TokenType.COMMA)) {
+              this.advance();
+            } else {
+              this.advance();
+            }
+          }
+          if (this.check(TokenType.RPAREN)) this.advance(); // ')' 소비
+        }
+        localVault = {
+          path: vaultPath,
+          autosave,
+          line: vaultAnnotToken.line,
+          column: vaultAnnotToken.column,
+        };
+        if (process.env.DEBUG_PARSER) {
+          console.log('[PARSER] @local_vault parsed:', JSON.stringify(localVault));
         }
       } else if (this.check(TokenType.IDENT)) {
         // @monitor, @api 등 → 이름 수집 후 다음 fn에 적용
@@ -983,6 +1066,8 @@ export class Parser {
       lintConfig,     // Native-Linter: @lint(...) 어노테이션 설정
       allowOrigins,   // Hardware-CORS: @allow_origin(...) 도메인 화이트리스트
       cspPolicy,      // Native-CSP-Shield: @csp_policy(...) 정책 문자열
+      validateSchemas: validateSchemas.length > 0 ? validateSchemas : undefined,  // Native-Request-Validator: @validate_schema(...)
+      localVault,     // Native-JSON-Vault: @local_vault(...) 설정
     };
   }
 
@@ -1706,8 +1791,10 @@ export class Parser {
       }
     }
 
-    // Parse body expression (must be present)
-    const body = this.parseExpression();
+    // Parse body: block statement { ... } or expression
+    const body = this.check(TokenType.LBRACE)
+      ? this.parseBlockStatement()
+      : this.parseExpression();
 
     return {
       type: 'lambda',
