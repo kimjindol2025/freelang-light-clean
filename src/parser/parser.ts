@@ -420,6 +420,7 @@ export class Parser {
     const exports: ExportStatement[] = [];
     const statements: Statement[] = [];
     let lintConfig: LintConfig | undefined;
+    let allowOrigins: string[] | undefined;  // Hardware-CORS: @allow_origin(...)
 
     // Native-Linter: 파일 최상단 @lint 어노테이션 파싱
     // Self-Monitoring Kernel: @monitor 등 기타 어노테이션도 여기서 수집
@@ -431,18 +432,65 @@ export class Parser {
         if (process.env.DEBUG_PARSER) {
           console.log('[PARSER] @lint annotation parsed:', JSON.stringify(lintConfig));
         }
+      } else if (this.check(TokenType.IDENT) && this.current().value === 'allow_origin') {
+        // Hardware-CORS: @allow_origin("https://dclub.kr", "https://*.washpark.com")
+        // → 도메인 목록을 파싱하여 module.allowOrigins에 저장
+        this.advance(); // 'allow_origin' 소비
+        const domains: string[] = [];
+        if (this.check(TokenType.LPAREN)) {
+          this.advance(); // '(' 소비
+          while (!this.check(TokenType.RPAREN) && !this.check(TokenType.EOF)) {
+            if (this.check(TokenType.STRING)) {
+              const raw = String(this.advance().value);
+              // 따옴표 제거 ("https://dclub.kr" → https://dclub.kr)
+              domains.push(raw.replace(/^["']|["']$/g, ''));
+            } else if (this.check(TokenType.COMMA)) {
+              this.advance(); // ',' 소비
+            } else {
+              this.advance(); // 예상치 못한 토큰 스킵
+            }
+          }
+          if (this.check(TokenType.RPAREN)) this.advance(); // ')' 소비
+        }
+        allowOrigins = domains;
+        if (process.env.DEBUG_PARSER) {
+          console.log('[PARSER] @allow_origin parsed:', JSON.stringify(allowOrigins));
+        }
       } else if (this.check(TokenType.IDENT)) {
         // @monitor, @api 등 → 이름 수집 후 다음 fn에 적용
         const annotName = this.advance().value;
-        topLevelAnnotations.push(annotName);
-        // @monitor(level: .detailed) 형태 파라미터 스킵
-        if (this.check(TokenType.LPAREN)) {
+        if (annotName === 'profile' && this.check(TokenType.LPAREN)) {
+          // @profile(sampling_rate: N, output: .X) → "profile:rate=N,output=X"
           this.advance();
-          let depth = 1;
+          let rateValue = '10'; let outputValue = 'both'; let depth = 1;
           while (depth > 0 && !this.check(TokenType.EOF)) {
-            if (this.check(TokenType.LPAREN)) depth++;
-            else if (this.check(TokenType.RPAREN)) depth--;
+            if (this.check(TokenType.LPAREN)) { depth++; this.advance(); continue; }
+            if (this.check(TokenType.RPAREN)) { depth--; if (depth === 0) break; this.advance(); continue; }
+            if (this.check(TokenType.IDENT) && this.current().value === 'sampling_rate') {
+              this.advance();
+              if (this.check(TokenType.COLON)) this.advance();
+              if (this.check(TokenType.NUMBER)) { rateValue = String(this.current().value); this.advance(); continue; }
+            }
+            if (this.check(TokenType.IDENT) && this.current().value === 'output') {
+              this.advance();
+              if (this.check(TokenType.COLON)) this.advance();
+              if (this.check(TokenType.DOT)) { this.advance(); if (this.check(TokenType.IDENT)) { outputValue = this.current().value; this.advance(); continue; } }
+            }
             this.advance();
+          }
+          if (this.check(TokenType.RPAREN)) this.advance();
+          topLevelAnnotations.push(`profile:rate=${rateValue},output=${outputValue}`);
+        } else {
+          topLevelAnnotations.push(annotName);
+          // @monitor(level: .detailed) 형태 파라미터 스킵
+          if (this.check(TokenType.LPAREN)) {
+            this.advance();
+            let depth = 1;
+            while (depth > 0 && !this.check(TokenType.EOF)) {
+              if (this.check(TokenType.LPAREN)) depth++;
+              else if (this.check(TokenType.RPAREN)) depth--;
+              this.advance();
+            }
           }
         }
       } else {
@@ -666,7 +714,8 @@ export class Parser {
       imports,
       exports,
       statements,
-      lintConfig,  // Native-Linter: @lint(...) 어노테이션 설정
+      lintConfig,     // Native-Linter: @lint(...) 어노테이션 설정
+      allowOrigins,   // Hardware-CORS: @allow_origin(...) 도메인 화이트리스트
     };
   }
 

@@ -19,6 +19,8 @@ import { registerFsExtendedFunctions } from './stdlib-fs-extended';
 import { trackFunctionCall, isHotFunction, generateHotspotReport } from './phase-jit/hotspot-detector';
 import { SimplePromise } from './runtime/simple-promise';
 import { registerInsightFunctions } from './stdlib/insight-builtins';
+import { registerProfilerFunctions } from './stdlib/profiler-builtins';
+import { registerORMNativeFunctions } from './stdlib/orm-native';
 
 const MAX_CYCLES = 100_000;
 const MAX_STACK  = 10_000;
@@ -68,6 +70,10 @@ export class VM {
     this.nativeFunctionRegistry.setVM(this);
     // Self-Monitoring Kernel: insight_enter/exit/report/json/dashboard/gogs
     registerInsightFunctions(this.nativeFunctionRegistry);
+    // Self-Profiling Runtime: profiler_enter/exit/report/flame_json/send_gogs
+    registerProfilerFunctions(this.nativeFunctionRegistry);
+    // Compile-Time-ORM: orm_table_init/insert/find_all/find_one/update/delete/count
+    registerORMNativeFunctions(this.nativeFunctionRegistry);
   }
 
   /**
@@ -734,6 +740,23 @@ export class VM {
               }
             }
 
+            // Self-Profiling Runtime: @profile(sampling_rate: N, output: .X) 처리
+            // annotation 형태: "profile:rate=10,output=flame_graph"
+            const profileAnnot = fn.annotations?.find((a: string) => a === 'profile' || a.startsWith('profile:'));
+            let isProfiled = false;
+            if (profileAnnot) {
+              isProfiled = true;
+              // 최초 호출 시 프로파일러 활성화 (rate 파싱)
+              const rateMatch = profileAnnot.match(/rate=(\d+)/);
+              const rateMs = rateMatch ? parseInt(rateMatch[1]) : 10;
+              if (this.nativeFunctionRegistry.exists('profiler_enable')) {
+                this.nativeFunctionRegistry.call('profiler_enable', [rateMs]);
+              }
+              if (this.nativeFunctionRegistry.exists('profiler_enter')) {
+                this.nativeFunctionRegistry.call('profiler_enter', [funcName]);
+              }
+            }
+
             // DEBUG: Log generated IR
             if (process.env.DEBUG_STORE) {
               console.log(`\n[DEBUG] Function ${funcName} body IR (${bodyIR.length} instructions):`);
@@ -762,6 +785,13 @@ export class VM {
               const insightReg = this.nativeFunctionRegistry;
               if (insightReg.exists('insight_exit')) {
                 insightReg.call('insight_exit', [funcName]);
+              }
+            }
+
+            // Self-Profiling Runtime: @profile → 함수 종료 기록
+            if (isProfiled) {
+              if (this.nativeFunctionRegistry.exists('profiler_exit')) {
+                this.nativeFunctionRegistry.call('profiler_exit', [funcName]);
               }
             }
 
