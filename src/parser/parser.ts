@@ -489,6 +489,85 @@ export class Parser {
                 }
                 this.advance(); // ')' 소비
                 pendingAnnotations.push(eventValue ? `git_hook:${eventValue}` : 'git_hook');
+              } else if (annotName === 'profile') {
+                // Self-Profiling Runtime: @profile(sampling_rate: 1000, output: .flame_graph)
+                // → "profile:rate=1000,output=flame_graph" 형태로 직렬화
+                let rateValue = '10';    // 기본 10ms
+                let outputValue = 'both';
+                let depth = 1;
+                while (depth > 0 && !this.check(TokenType.EOF)) {
+                  if (this.check(TokenType.LPAREN)) { depth++; this.advance(); continue; }
+                  if (this.check(TokenType.RPAREN)) { depth--; if (depth === 0) break; this.advance(); continue; }
+                  // sampling_rate: 숫자
+                  if (this.check(TokenType.IDENT) && this.current().value === 'sampling_rate') {
+                    this.advance(); // 'sampling_rate' 소비
+                    if (this.check(TokenType.COLON)) this.advance(); // ':' 소비
+                    if (this.check(TokenType.NUMBER)) { rateValue = String(this.current().value); this.advance(); continue; }
+                  }
+                  // output: .flame_graph | .report | .both
+                  if (this.check(TokenType.IDENT) && this.current().value === 'output') {
+                    this.advance(); // 'output' 소비
+                    if (this.check(TokenType.COLON)) this.advance(); // ':' 소비
+                    if (this.check(TokenType.DOT)) {
+                      this.advance(); // '.' 소비
+                      if (this.check(TokenType.IDENT)) { outputValue = this.current().value; this.advance(); continue; }
+                    }
+                  }
+                  this.advance();
+                }
+                if (this.check(TokenType.RPAREN)) this.advance(); // ')' 소비
+                pendingAnnotations.push(`profile:rate=${rateValue},output=${outputValue}`);
+              } else if (annotName === 'secure_token') {
+                // Native-Auth-Token: @secure_token(algo: .hmac_sha256, expires: 3600)
+                // → "secure_token:algo=hmac_sha256,expires=3600"
+                let algoValue   = 'hmac_sha256';
+                let expiresValue = '3600';
+                let depth = 1;
+                while (depth > 0 && !this.check(TokenType.EOF)) {
+                  if (this.check(TokenType.LPAREN)) { depth++; this.advance(); continue; }
+                  if (this.check(TokenType.RPAREN)) { depth--; if (depth === 0) break; this.advance(); continue; }
+                  if (this.check(TokenType.IDENT)) {
+                    const kw = this.advance().value;
+                    if (this.check(TokenType.COLON)) this.advance();
+                    if (kw === 'algo') {
+                      if (this.check(TokenType.DOT)) this.advance(); // .hmac_sha256
+                      if (this.check(TokenType.IDENT)) { algoValue = this.advance().value; continue; }
+                    } else if (kw === 'expires') {
+                      if (this.check(TokenType.NUMBER)) { expiresValue = String(this.advance().value); continue; }
+                    }
+                  } else {
+                    this.advance();
+                  }
+                }
+                if (this.check(TokenType.RPAREN)) this.advance();
+                pendingAnnotations.push(`secure_token:algo=${algoValue},expires=${expiresValue}`);
+              } else if (annotName.startsWith('db_')) {
+                // Compile-Time-ORM: @db_table(name: "wash_logs") → "db_table:name=wash_logs"
+                // @db_column(type: varchar) → "db_column:type=varchar"
+                const kv: string[] = [];
+                let depth = 1;
+                while (depth > 0 && !this.check(TokenType.EOF)) {
+                  if (this.check(TokenType.LPAREN)) { depth++; this.advance(); continue; }
+                  if (this.check(TokenType.RPAREN)) { depth--; if (depth === 0) break; this.advance(); continue; }
+                  // key: value 파싱
+                  if (this.check(TokenType.IDENT)) {
+                    const key = this.advance().value;
+                    let val = '';
+                    if (this.check(TokenType.COLON)) this.advance();
+                    if (this.check(TokenType.DOT)) this.advance(); // .enum_val
+                    if (this.check(TokenType.IDENT)) val = this.advance().value;
+                    else if (this.check(TokenType.STRING)) val = this.advance().value;
+                    else if (this.check(TokenType.NUMBER)) val = String(this.advance().value);
+                    if (key) kv.push(`${key}=${val}`);
+                  } else if (this.check(TokenType.COMMA)) {
+                    this.advance();
+                  } else {
+                    this.advance();
+                  }
+                }
+                if (this.check(TokenType.RPAREN)) this.advance();
+                const serialized = kv.length > 0 ? `${annotName}:${kv.join(',')}` : annotName;
+                pendingAnnotations.push(serialized);
               } else {
                 // 기타 어노테이션: 파라미터 스킵
                 let depth = 1;
@@ -533,6 +612,37 @@ export class Parser {
         }
 
         const stmt = this.parseStatement();
+
+        // Compile-Time-ORM + Native-Auth-Token: struct 선언에 수집된 어노테이션 주입
+        if (stmt.type === 'struct' && pendingAnnotations.length > 0) {
+          // Native-Auth-Token: @secure_token → secureToken 필드로 분리
+          const nonAuthAnnotations: string[] = [];
+          for (const a of pendingAnnotations) {
+            if (a.startsWith('secure_token:')) {
+              // "secure_token:algo=hmac_sha256,expires=3600" 파싱
+              const params: Record<string, string> = {};
+              a.slice('secure_token:'.length).split(',').forEach(kv => {
+                const [k, v] = kv.split('=');
+                if (k && v !== undefined) params[k.trim()] = v.trim();
+              });
+              (stmt as any).secureToken = {
+                algo: (params['algo'] === 'sha256' ? 'sha256' : 'hmac_sha256'),
+                expires: parseInt(params['expires'] ?? '3600', 10) || 3600,
+              };
+            } else {
+              nonAuthAnnotations.push(a);
+            }
+          }
+          if (nonAuthAnnotations.length > 0) {
+            (stmt as any).annotations = nonAuthAnnotations.map((a: string) => {
+              const colonIdx = a.indexOf(':');
+              if (colonIdx > 0) {
+                return { name: a.slice(0, colonIdx), args: { value: a.slice(colonIdx + 1) } };
+              }
+              return { name: a };
+            });
+          }
+        }
 
         // Separate imports/exports from other statements
         // Check statement type using type field
@@ -2197,6 +2307,33 @@ export class Parser {
     const fields: Array<{ name: string; fieldType?: string }> = [];
 
     while (!this.check(TokenType.RBRACE) && !this.check(TokenType.EOF)) {
+      // Compile-Time-ORM: 필드 앞 어노테이션 수집 (@db_id, @db_auto_inc, @db_column(...))
+      const fieldAnnotations: Array<{ name: string; args?: Record<string, string> }> = [];
+      while (this.check(TokenType.AT)) {
+        this.advance(); // '@' 소비
+        if (this.check(TokenType.IDENT)) {
+          const annotName = this.advance().value;
+          const annotArgs: Record<string, string> = {};
+          // 괄호 안 key: value 파라미터 파싱: @db_column(type: .varchar, pk: true)
+          if (this.check(TokenType.LPAREN)) {
+            this.advance(); // '('
+            while (!this.check(TokenType.RPAREN) && !this.check(TokenType.EOF)) {
+              const key = this.check(TokenType.IDENT) ? this.advance().value : '';
+              if (this.check(TokenType.COLON)) this.advance();
+              let val = '';
+              if (this.check(TokenType.DOT)) { this.advance(); }
+              if (this.check(TokenType.IDENT)) val = this.advance().value;
+              else if (this.check(TokenType.STRING)) val = this.advance().value;
+              else if (this.check(TokenType.NUMBER)) val = String(this.advance().value);
+              if (key) annotArgs[key] = val;
+              if (this.check(TokenType.COMMA)) this.advance();
+            }
+            if (this.check(TokenType.RPAREN)) this.advance(); // ')'
+          }
+          fieldAnnotations.push({ name: annotName, args: Object.keys(annotArgs).length > 0 ? annotArgs : undefined });
+        }
+      }
+
       const fieldNameToken = this.expect(TokenType.IDENT, 'Expected field name');
       const fieldName = fieldNameToken.value;
 
@@ -2208,7 +2345,11 @@ export class Parser {
         fieldType = this.parseType();
       }
 
-      fields.push({ name: fieldName, fieldType });
+      fields.push({
+        name: fieldName,
+        fieldType,
+        ...(fieldAnnotations.length > 0 ? { annotations: fieldAnnotations } : {})
+      });
 
       // 필드 구분자 (쉼표, 선택적)
       if (this.check(TokenType.COMMA)) {

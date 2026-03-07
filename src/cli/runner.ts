@@ -24,6 +24,8 @@ import { registerFsExtendedFunctions } from '../stdlib-fs-extended';
 import { registerTeamDFunctions } from '../stdlib-team-d-http-db';
 import { registerVCSFunctions } from '../stdlib/stdlib-vcs';
 import { installGate } from '../vcs/vcs-bridge';
+import { generateORMMeta } from '../codegen/orm-codegen';
+import { registerORMMeta } from '../stdlib/orm-native';
 
 export interface RunResult {
   success: boolean;
@@ -92,6 +94,13 @@ export class ProgramRunner {
       // 2. Parse: TokenBuffer → Module AST (supports fn/let/if/while/for)
       const parser = new Parser(tokenBuffer);
       const module = parser.parseModule() as any;
+
+      // 2.4. Compile-Time-ORM: @db_table struct 스캔 → SQL 컴파일 타임 생성
+      // generateORMMeta는 런타임 이전 실행 → 런타임 SQL 파싱 오버헤드 0
+      const ormMetas = generateORMMeta(module as any);
+      if (ormMetas.length > 0) {
+        registerORMMeta(ormMetas);
+      }
 
       // 2.5. Phase 2: Register user-defined functions before execution
       // Extract FunctionStatements from module.statements and register them

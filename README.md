@@ -432,9 +432,47 @@ v2.8.0  Native-Expect (Chai 대체): expect().to.be.equal() 언어 정규 문법
 언어 키워드:      45개  (+1: expect)
 어서션 종류:      5개 (equal / notEqual / true / false / exists)
 린터 규칙:        3개 (no_unused / shadowing_check / strict_pointers)
-대체된 npm 패키지: 9개 (ESLint/Apollo/PM2/Swagger/nodemailer/zlib/sharp/helmet/chai)
+대체된 npm 패키지: 10개 (ESLint/Apollo/PM2/Swagger/nodemailer/zlib/sharp/helmet/chai/**Husky**)
 커밋:             475+개
 외부 의존성:      0%
+```
+
+---
+
+### 🔒 Native Guard Hook (v2.9) — Husky 완전 대체
+
+- **Zero-Dependency Hooks**: `.git/hooks` 미사용. `git config core.hooksPath` + `~/.freelang-gate/hooks/` 방식
+- **Compiler-Level Enforcement**: `@git_hook(event: .pre_commit)` 어노테이션을 컴파일러가 감지 → 자동 Gate 등록
+- **Binary-Gate Signal**: 훅 함수 실패 시 `process.exit(1)` → Git 커밋/푸시 바이너리 수준 차단
+- **VCS Stdlib**: `vcs_lint()`, `vcs_test()`, `vcs_check_secrets()`, `git_staged_files()` 내장
+
+```
+# FreeLang 문법으로 커밋 규칙 정의
+@git_hook(event: .pre_commit)
+fn validate_before_save() {
+    vcs_check_secrets()   // 하드코딩 시크릿 감지 → 커밋 차단
+    vcs_lint()            // TypeScript/ESLint 검사
+    vcs_test()            // 테스트 실행
+}
+
+@git_hook(event: .pre_push)
+fn full_test_before_push() {
+    if git_branch() == "main" {
+        vcs_exit_error("main 직접 push 금지. PR을 사용하세요.")
+    }
+    vcs_test()
+}
+```
+
+```bash
+# 설치 (Husky 설치 없이)
+freelang gate install commit-gate.free
+
+# 상태 확인
+freelang gate status
+
+# 훅 수동 실행
+freelang gate run pre-commit
 ```
 
 ---
@@ -452,6 +490,6 @@ MIT License © 2026
 
 ---
 
-**현재 버전**: v2.8.0
+**현재 버전**: v2.9.0
 **최종 업데이트**: 2026-03-08
 **외부 의존성**: 0%

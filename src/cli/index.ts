@@ -16,6 +16,7 @@ import { ProgramRunner } from './runner';
 import { AOTCompiler } from './aot-compiler';
 import { ProofTester } from './test-runner';
 import { ModuleLinker } from '../linker/module-linker';
+import { runGateCLI } from './gate-cli';
 
 /**
  * 도움말 표시
@@ -32,6 +33,7 @@ Usage:
   freelang <file.free>        # 파일 직접 실행
   freelang test [path]        # Proof-Tester: @test 함수 실행
   freelang build <file.fl>    # KPM-Linker: 단일 바이너리 빌드
+  freelang gate <sub>         # Commit-Gate: git hook 컴파일러 내장 관리
   freelang --help             # 도움말
   freelang --version          # 버전 정보
 
@@ -517,6 +519,12 @@ async function main(): Promise<void> {
       console.error(`[build] Failed: ${result.error}`);
       process.exit(1);
     }
+  }
+
+  // "gate" 서브커맨드: Commit-Gate (Husky 대체)
+  if (args[0] === 'gate') {
+    await runGateCLI(args.slice(1));
+    return;
   }
 
   // "test" 서브커맨드: Proof-Tester
