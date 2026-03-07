@@ -56,6 +56,10 @@ export enum TokenType {
   // MOSS-Style: 제로-런타임 스타일 선언
   STYLE = 'STYLE',       // style 키워드
 
+  // Self-Testing Compiler: 내장 테스트 블록
+  TEST = 'TEST',         // test 블록 (릴리즈 빌드에서 0바이트 제거)
+  EXPECT = 'EXPECT',     // expect(actual).to.be.xxx(expected) 어서션 (test 블록 전용)
+
   // Identifiers & Literals
   IDENT = 'IDENT',
   NUMBER = 'NUMBER',
@@ -123,7 +127,13 @@ export enum TokenType {
   EOF = 'EOF',
   NEWLINE = 'NEWLINE',
   COMMENT = 'COMMENT',
-  ILLEGAL = 'ILLEGAL'
+  ILLEGAL = 'ILLEGAL',
+
+  // Native-Graph: 정적 컴파일 기반 GraphQL (Apollo 대체)
+  SCHEMA = 'SCHEMA',     // schema 블록 정의
+  RESOLVER = 'RESOLVER', // @resolver 어노테이션 대상 키워드
+  QUERY = 'QUERY',       // query 타입 정의
+  MUTATION = 'MUTATION'  // mutation 타입 정의
 }
 
 /**
@@ -190,7 +200,17 @@ export const KEYWORDS: Record<string, TokenType> = {
   'secret': TokenType.SECRET,
 
   // MOSS-Style: 제로-런타임 스타일 선언
-  'style': TokenType.STYLE
+  'style': TokenType.STYLE,
+
+  // Self-Testing Compiler: 내장 테스트 블록
+  'test': TokenType.TEST,
+  'expect': TokenType.EXPECT,   // expect 어서션 (test 블록 전용)
+
+  // Native-Graph: 정적 컴파일 기반 GraphQL (Apollo 대체)
+  'schema': TokenType.SCHEMA,
+  'resolver': TokenType.RESOLVER,
+  'query': TokenType.QUERY,
+  'mutation': TokenType.MUTATION
 };
 
 /**

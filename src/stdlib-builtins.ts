@@ -785,7 +785,7 @@ export function registerStdlibFunctions(registry: NativeFunctionRegistry): void 
     executor: (args) => {
       const serverObj = args[0] as any;
       const handler = args[1] as any;
-
+      process.stderr.write(`[DBG] http_on_request: args.length=${args.length}, handler type=${typeof handler}, serverObj type=${typeof serverObj}\n`);
       serverObj.requestHandler = handler;
       return serverObj;
     }
@@ -3905,5 +3905,373 @@ export function registerStdlibFunctions(registry: NativeFunctionRegistry): void 
   // ────────────────────────────────────────────────────────────
   registerTeamFFunctions(registry);
 
+  // ────────────────────────────────────────────────────────────
+  // Native-Graph: 정적 컴파일 기반 GraphQL 엔진 (Apollo 완전 대체)
+  // 외부 의존성 0% - Node.js http 모듈만 사용
+  // 빌트인: graph_schema_define / graph_resolver_add / graph_server_start
+  //         graph_execute / graph_server_stop
+  // ────────────────────────────────────────────────────────────
+  registerNativeGraphFunctions(registry);
+
   // Silent registration (no console output)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Native-Graph 빌트인 구현 (Apollo Server 대체)
+// FreeLang schema 블록 → 정적 타입 레지스트리 + 리졸버 디스패치 테이블
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface GraphField {
+  name: string;
+  type: string;        // 'Int' | 'String' | 'Float' | 'Boolean' | '[TypeName]' | 'TypeName'
+  isList: boolean;
+  nullable: boolean;
+}
+
+interface GraphTypeDef {
+  name: string;
+  fields: GraphField[];
+  isQuery: boolean;
+  isMutation: boolean;
+}
+
+interface GraphResolverEntry {
+  typeName: string;
+  fieldName: string;
+  fn: (...args: any[]) => any;
+}
+
+// 글로벌 그래프 상태 (단일 schema 인스턴스)
+const __graph_types = new Map<string, GraphTypeDef>();
+const __graph_resolvers = new Map<string, GraphResolverEntry>();
+const __graph_servers = new Map<number, any>();
+
+/**
+ * GQL 요청을 파싱하고 리졸버 체인으로 실행
+ * 단순 필드 선택만 지원 (중첩 + 인자 포함)
+ */
+function __graph_execute_query(
+  typeName: string,
+  selections: Array<{ field: string; args: Map<string, any>; subFields: string[] }>,
+  rootArgs: Map<string, any>,
+  parentObj?: Map<string, any>  // 부모 리졸버가 반환한 데이터 오브젝트
+): Map<string, any> {
+  const result = new Map<string, any>();
+
+  for (const sel of selections) {
+    const resolverKey = `${typeName}.${sel.field}`;
+    const resolver = __graph_resolvers.get(resolverKey);
+
+    let val: any;
+    if (resolver) {
+      // 명시적 리졸버 실행
+      val = resolver.fn(rootArgs, sel.args);
+    } else if (parentObj instanceof Map && parentObj.has(sel.field)) {
+      // 리졸버 없음 + 부모 Map에 필드 존재 → 스칼라 직접 읽기
+      val = parentObj.get(sel.field);
+    } else {
+      val = null;
+    }
+
+    if (sel.subFields.length > 0 && val != null) {
+      // 중첩 객체: 하위 타입 재귀 실행
+      const typeDef = __graph_types.get(typeName);
+      const fieldDef = typeDef?.fields.find(f => f.name === sel.field);
+      const subTypeName = fieldDef
+        ? fieldDef.type.replace(/[\[\]!]/g, '')
+        : typeName;
+      const subSels = sel.subFields.map(sf => ({
+        field: sf, args: new Map<string, any>(), subFields: []
+      }));
+
+      if (Array.isArray(val)) {
+        // 리스트: 각 요소별 하위 필드 매핑
+        result.set(sel.field, val.map((item: any) => {
+          const itemMap = item instanceof Map ? item : new Map(Object.entries(item as any));
+          return __graph_execute_query(subTypeName, subSels, rootArgs, itemMap);
+        }));
+      } else {
+        const subParent = val instanceof Map ? val : new Map(Object.entries(val as any));
+        result.set(sel.field, __graph_execute_query(subTypeName, subSels, rootArgs, subParent));
+      }
+    } else {
+      result.set(sel.field, val);
+    }
+  }
+  return result;
+}
+
+/**
+ * 최소 GQL 쿼리 파서 (중괄호 기반 필드 선택 추출)
+ * { user(id: 1) { name email } } 형태 지원
+ */
+function __graph_parse_gql(body: string): {
+  operationType: 'query' | 'mutation';
+  rootField: string;
+  rootArgs: Map<string, any>;
+  subFields: string[];
+} | null {
+  const trimmed = body.trim();
+  const opMatch = trimmed.match(/^(query|mutation)?\s*\{?\s*(\w+)\s*(?:\(([^)]*)\))?\s*\{([^}]*)\}/s);
+  if (!opMatch) return null;
+
+  const operationType = (opMatch[1] || 'query') as 'query' | 'mutation';
+  const rootField = opMatch[2];
+  const argsStr = opMatch[3] || '';
+  const fieldsStr = opMatch[4] || '';
+
+  const rootArgs = new Map<string, any>();
+  if (argsStr) {
+    for (const kv of argsStr.split(',')) {
+      const [k, v] = kv.split(':').map(s => s.trim());
+      if (k && v !== undefined) {
+        const num = Number(v.replace(/"/g, '').trim());
+        rootArgs.set(k, isNaN(num) ? v.replace(/"/g, '').trim() : num);
+      }
+    }
+  }
+
+  const subFields = fieldsStr.split(/[\s\n]+/).map(f => f.trim()).filter(f => /^\w+$/.test(f));
+
+  return { operationType, rootField, rootArgs, subFields };
+}
+
+/**
+ * Map → 일반 JS 객체 (JSON 직렬화용)
+ */
+function __graph_map_to_obj(val: any): any {
+  if (val instanceof Map) {
+    const obj: Record<string, any> = {};
+    val.forEach((v, k) => { obj[k] = __graph_map_to_obj(v); });
+    return obj;
+  }
+  if (Array.isArray(val)) return val.map(__graph_map_to_obj);
+  return val;
+}
+
+function registerNativeGraphFunctions(registry: NativeFunctionRegistry): void {
+
+  // ── graph_schema_define(typeName, fields_json) ──────────────────────────
+  // 타입 정의를 정적 레지스트리에 등록
+  // fields_json 예: '[{"name":"id","type":"Int"},{"name":"name","type":"String"}]'
+  registry.register({
+    name: 'graph_schema_define',
+    module: 'graph',
+    signature: {
+      name: 'graph_schema_define',
+      returnType: 'void',
+      parameters: [
+        { name: 'typeName', type: 'string' },
+        { name: 'fieldsJson', type: 'string' }
+      ],
+      category: 'http'
+    },
+    executor: (args) => {
+      const typeName = String(args[0]);
+      const isQuery = typeName === 'Query';
+      const isMutation = typeName === 'Mutation';
+      let fields: GraphField[] = [];
+
+      try {
+        const raw = JSON.parse(String(args[1]));
+        fields = (Array.isArray(raw) ? raw : []).map((f: any) => ({
+          name: f.name || '',
+          type: String(f.type || 'String').replace(/[\[\]!]/g, ''),
+          isList: String(f.type || '').startsWith('['),
+          nullable: !String(f.type || '').endsWith('!')
+        }));
+      } catch { /* 빈 필드 리스트로 처리 */ }
+
+      __graph_types.set(typeName, { name: typeName, fields, isQuery, isMutation });
+    }
+  });
+
+  // ── graph_resolver_add(typeName, fieldName, fn) ────────────────────────
+  // 리졸버 함수를 디스패치 테이블에 등록 (정적 바인딩)
+  registry.register({
+    name: 'graph_resolver_add',
+    module: 'graph',
+    signature: {
+      name: 'graph_resolver_add',
+      returnType: 'void',
+      parameters: [
+        { name: 'typeName', type: 'string' },
+        { name: 'fieldName', type: 'string' },
+        { name: 'fn', type: 'function' }
+      ],
+      category: 'http'
+    },
+    executor: (args) => {
+      const typeName = String(args[0]);
+      const fieldName = String(args[1]);
+      const fn = args[2];
+      if (typeof fn !== 'function') return;
+      const key = `${typeName}.${fieldName}`;
+      __graph_resolvers.set(key, { typeName, fieldName, fn });
+    }
+  });
+
+  // ── graph_server_start(port) ──────────────────────────────────────────
+  // POST /graphql 엔드포인트 + GET /graphql (인트로스펙션 HTML UI) 서버 기동
+  // 외부 의존성 0% - Node.js http 모듈만 사용
+  registry.register({
+    name: 'graph_server_start',
+    module: 'graph',
+    signature: {
+      name: 'graph_server_start',
+      returnType: 'object',
+      parameters: [
+        { name: 'port', type: 'number' }
+      ],
+      category: 'event'
+    },
+    executor: (args) => {
+      const port = Number(args[0]) || 4000;
+      const nodeHttp = require('http');
+
+      const server = nodeHttp.createServer((req: any, res: any) => {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+        if (req.method === 'OPTIONS') {
+          res.writeHead(204); res.end(); return;
+        }
+
+        // GET /graphql → 내장 GraphiQL-lite HTML UI (외부 CDN 0%)
+        if (req.method === 'GET' && req.url?.startsWith('/graphql')) {
+          const types = Array.from(__graph_types.values());
+          const typeList = types.map(t =>
+            `<details><summary><b>${t.name}</b></summary><ul>${
+              t.fields.map(f => `<li>${f.name}: ${f.isList ? '[' : ''}${f.type}${f.isList ? ']' : ''}</li>`).join('')
+            }</ul></details>`
+          ).join('');
+
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          res.end(`<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>FreeLang Native-Graph UI</title>
+<style>body{font-family:monospace;background:#1e1e2e;color:#cdd6f4;padding:20px}
+textarea{width:100%;height:120px;background:#313244;color:#cdd6f4;border:1px solid #585b70;padding:8px}
+button{background:#cba6f7;color:#1e1e2e;border:none;padding:8px 16px;cursor:pointer;font-weight:bold}
+pre{background:#313244;padding:12px;overflow:auto}details{margin:4px 0}summary{cursor:pointer;color:#89b4fa}
+</style></head><body>
+<h2>🕸️ FreeLang Native-Graph Engine</h2>
+<h3>Schema</h3>${typeList}
+<h3>Query</h3>
+<textarea id="q">{ user(id: 1) { id name } }</textarea><br><br>
+<button onclick="run()">Execute</button>
+<pre id="r"></pre>
+<script>
+async function run(){
+  const q=document.getElementById('q').value;
+  const r=await fetch('/graphql',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q})});
+  const d=await r.json();
+  document.getElementById('r').textContent=JSON.stringify(d,null,2);
+}
+</script></body></html>`);
+          return;
+        }
+
+        // POST /graphql → GQL 실행
+        if (req.method === 'POST' && req.url?.startsWith('/graphql')) {
+          const chunks: Buffer[] = [];
+          req.on('data', (c: Buffer) => chunks.push(c));
+          req.on('end', () => {
+            try {
+              const body = Buffer.concat(chunks).toString('utf-8');
+              const payload = JSON.parse(body);
+              const gqlStr = payload.query || payload.mutation || '';
+
+              const parsed = __graph_parse_gql(gqlStr);
+              if (!parsed) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ errors: [{ message: 'GQL parse error' }] }));
+                return;
+              }
+
+              const rootTypeName = parsed.operationType === 'mutation' ? 'Mutation' : 'Query';
+              const selections = [{
+                field: parsed.rootField,
+                args: parsed.rootArgs,
+                subFields: parsed.subFields
+              }];
+
+              const data = __graph_execute_query(rootTypeName, selections, parsed.rootArgs);
+              const result = __graph_map_to_obj(data);
+
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ data: result }));
+            } catch (e: any) {
+              res.writeHead(500, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ errors: [{ message: e.message }] }));
+            }
+          });
+          return;
+        }
+
+        res.writeHead(404); res.end('Not Found');
+      });
+
+      server.listen(port, () => {
+        console.log(`[Native-Graph] 🕸️ GraphQL engine on :${port}/graphql (외부 의존성 0%)`);
+      });
+
+      const serverObj = new Map<string, any>();
+      serverObj.set('__type', 'GraphServer');
+      serverObj.set('port', port);
+      serverObj.set('__server', server);
+      __graph_servers.set(port, serverObj);
+      return serverObj;
+    }
+  });
+
+  // ── graph_execute(gqlString) ──────────────────────────────────────────
+  // 서버 없이 GQL 문자열을 직접 실행 (단위 테스트용)
+  registry.register({
+    name: 'graph_execute',
+    module: 'graph',
+    signature: {
+      name: 'graph_execute',
+      returnType: 'string',
+      parameters: [
+        { name: 'gqlString', type: 'string' }
+      ],
+      category: 'http'
+    },
+    executor: (args) => {
+      const gqlStr = String(args[0]);
+      const parsed = __graph_parse_gql(gqlStr);
+      if (!parsed) return JSON.stringify({ errors: [{ message: 'GQL parse error' }] });
+
+      const rootTypeName = parsed.operationType === 'mutation' ? 'Mutation' : 'Query';
+      const selections = [{
+        field: parsed.rootField,
+        args: parsed.rootArgs,
+        subFields: parsed.subFields
+      }];
+
+      const data = __graph_execute_query(rootTypeName, selections, parsed.rootArgs);
+      return JSON.stringify({ data: __graph_map_to_obj(data) });
+    }
+  });
+
+  // ── graph_server_stop(port) ──────────────────────────────────────────
+  registry.register({
+    name: 'graph_server_stop',
+    module: 'graph',
+    signature: {
+      name: 'graph_server_stop',
+      returnType: 'void',
+      parameters: [{ name: 'port', type: 'number' }],
+      category: 'http'
+    },
+    executor: (args) => {
+      const port = Number(args[0]);
+      const srv = __graph_servers.get(port);
+      if (srv) {
+        srv.get('__server')?.close();
+        __graph_servers.delete(port);
+      }
+    }
+  });
 }
