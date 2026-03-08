@@ -798,10 +798,42 @@ export class Compiler {
         "uuid", "timestamp",
         // Channel (2)
         "send", "recv",
+        // Phase 2: Result<T,E> 및 Option<T> (8)
+        "Ok", "Err", "Some", "None",
+        "isOk", "isErr", "isSome", "isNone",
       ];
 
       if (builtins.includes(name)) {
         for (const arg of expr.args) this.compileExpr(arg);
+
+        // Phase 2: Result/Option 생성자 및 검사 함수는 특별 opcode로 컴파일
+        switch (name) {
+          case "Ok":
+            this.chunk.emit(Op.WRAP_OK, expr.line);
+            return;
+          case "Err":
+            this.chunk.emit(Op.WRAP_ERR, expr.line);
+            return;
+          case "Some":
+            this.chunk.emit(Op.WRAP_SOME, expr.line);
+            return;
+          case "None":
+            this.chunk.emit(Op.WRAP_NONE, expr.line);
+            return;
+          case "isOk":
+            this.chunk.emit(Op.IS_OK, expr.line);
+            return;
+          case "isErr":
+            this.chunk.emit(Op.IS_ERR, expr.line);
+            return;
+          case "isSome":
+            this.chunk.emit(Op.IS_SOME, expr.line);
+            return;
+          case "isNone":
+            this.chunk.emit(Op.IS_NONE, expr.line);
+            return;
+        }
+
         this.chunk.emit(Op.CALL_BUILTIN, expr.line);
         this.chunk.emitI32(this.chunk.addConstant(name), expr.line);
         this.chunk.emitByte(expr.args.length, expr.line);

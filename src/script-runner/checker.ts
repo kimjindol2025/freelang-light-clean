@@ -189,7 +189,7 @@ function typeToString(t: Type): string {
     case "option": return `Option<${typeToString(t.element)}>`;
     case "result": return `Result<${typeToString(t.ok)}, ${typeToString(t.err)}>`;
     case "struct": {
-      const fields = [...t.fields.entries()].map(([k, v]) => `${k}: ${typeToString(v)}`).join(", ");
+      const fields = Array.from(t.fields.entries()).map(([k, v]) => `${k}: ${typeToString(v)}`).join(", ");
       return `{ ${fields} }`;
     }
     case "fn": {
@@ -1159,6 +1159,9 @@ export class TypeChecker {
       "char_at", "contains", "split", "trim", "to_upper", "to_lower",
       "abs", "min", "max", "pow", "sqrt",
       "range", "channel", "panic", "typeof", "assert",
+      // Phase 2: Result<T, E> 및 Option<T> 함수
+      "Ok", "Err", "Some", "None",
+      "isOk", "isErr", "isSome", "isNone",
     ].includes(name);
   }
 
@@ -1188,6 +1191,13 @@ export class TypeChecker {
       case "trim": case "to_upper": case "to_lower": case "char_at":
         return { kind: "string" };
       case "slice": return { kind: "unknown" };
+      // Phase 2: Result<T, E> 및 Option<T> 타입
+      case "Ok": return { kind: "result", ok: { kind: "unknown" }, err: { kind: "unknown" } };
+      case "Err": return { kind: "result", ok: { kind: "unknown" }, err: { kind: "unknown" } };
+      case "Some": return { kind: "option", element: { kind: "unknown" } };
+      case "None": return { kind: "option", element: { kind: "unknown" } };
+      case "isOk": case "isErr": case "isSome": case "isNone":
+        return { kind: "bool" };
       default: return null;
     }
   }

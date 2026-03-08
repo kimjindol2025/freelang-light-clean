@@ -31,6 +31,29 @@ import {
 const MAX_CYCLES = 100_000;
 const MAX_STACK  = 10_000;
 
+// ── Result<T, E> & Option<T> 타입 정의 ──
+export interface ResultOk<T = any> {
+  tag: 'ok';
+  val: T;
+}
+
+export interface ResultErr<E = any> {
+  tag: 'err';
+  val: E;
+}
+
+export interface OptionSome<T = any> {
+  tag: 'some';
+  val: T;
+}
+
+export interface OptionNone {
+  tag: 'none';
+}
+
+export type Result<T = any, E = any> = ResultOk<T> | ResultErr<E>;
+export type Option<T = any> = OptionSome<T> | OptionNone;
+
 export interface TypeWarning {
   functionName: string;
   message: string;
@@ -41,8 +64,8 @@ export interface TypeWarning {
 }
 
 export class VM {
-  private stack: (number | Iterator | string | number[] | object)[] = [];
-  private vars: Map<string, number | number[] | Iterator | string | object> = new Map();
+  private stack: (number | Iterator | string | number[] | object | Result | Option)[] = [];
+  private vars: Map<string, number | number[] | Iterator | string | object | Result | Option> = new Map();
   private pc = 0;
   private cycles = 0;
   private callStack: number[] = [];  // for CALL/RET
@@ -1256,50 +1279,50 @@ export class VM {
 
       case Op.IS_OK: {
         // stack: [result] → [bool]
-        const value = this.stack.pop();
+        const value = this.stack.pop() as Result | undefined;
         this.guardStack();
-        this.stack.push(value?.tag === 'ok');
+        this.stack.push(value?.tag === 'ok' ? 1 : 0);
         this.pc++;
         break;
       }
 
       case Op.IS_ERR: {
         // stack: [result] → [bool]
-        const value = this.stack.pop();
+        const value = this.stack.pop() as Result | undefined;
         this.guardStack();
-        this.stack.push(value?.tag === 'err');
+        this.stack.push(value?.tag === 'err' ? 1 : 0);
         this.pc++;
         break;
       }
 
       case Op.IS_SOME: {
         // stack: [option] → [bool]
-        const value = this.stack.pop();
+        const value = this.stack.pop() as Option | undefined;
         this.guardStack();
-        this.stack.push(value?.tag === 'some');
+        this.stack.push(value?.tag === 'some' ? 1 : 0);
         this.pc++;
         break;
       }
 
       case Op.IS_NONE: {
         // stack: [option] → [bool]
-        const value = this.stack.pop();
+        const value = this.stack.pop() as Option | undefined;
         this.guardStack();
-        this.stack.push(value?.tag === 'none');
+        this.stack.push(value?.tag === 'none' ? 1 : 0);
         this.pc++;
         break;
       }
 
       case Op.UNWRAP: {
         // stack: [result/option] → [value] or throw
-        const value = this.stack.pop();
+        const value = this.stack.pop() as Result | Option | undefined;
         if (value?.tag === 'ok' || value?.tag === 'some') {
           this.guardStack();
-          this.stack.push(value.val);
+          this.stack.push((value as ResultOk | OptionSome).val);
         } else if (value?.tag === 'none') {
           throw new Error('panic:unwrap_on_none');
         } else if (value?.tag === 'err') {
-          throw new Error('panic:unwrap_on_err:' + String(value.val));
+          throw new Error('panic:unwrap_on_err:' + String((value as ResultErr).val));
         } else {
           throw new Error('panic:unwrap_on_non_result');
         }

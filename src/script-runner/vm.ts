@@ -538,6 +538,10 @@ export class VM {
           actor.stack.push({ tag: "some", val });
           break;
         }
+        case Op.WRAP_NONE: {
+          actor.stack.push({ tag: "none" });
+          break;
+        }
         case Op.UNWRAP: {
           const val = actor.stack.pop()!;
           if (val.tag === "ok" || val.tag === "some") {
