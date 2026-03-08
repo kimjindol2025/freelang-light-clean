@@ -1,0 +1,19 @@
+{
+  "name": "@freelang/vm",
+  "version": "2.9.1",
+  "description": "FreeLang VM - Virtual Machine runtime executor",
+  "main": "../../dist/src/vm/vm-executor.js",
+  "types": "../../dist/src/vm/vm-executor.d.ts",
+  "keywords": ["freelang", "vm", "runtime", "executor", "bytecode"],
+  "author": "Claude AI",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/freelang-io/freelang-compiler.git",
+    "directory": "packages/vm"
+  },
+  "dependencies": {},
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

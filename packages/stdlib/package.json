@@ -1,0 +1,22 @@
+{
+  "name": "@freelang/stdlib",
+  "version": "2.9.1",
+  "description": "FreeLang Standard Library - 1,500+ built-in functions",
+  "main": "../../dist/src/engine/builtins.js",
+  "types": "../../dist/src/engine/builtins.d.ts",
+  "keywords": ["freelang", "stdlib", "builtin", "functions", "library"],
+  "author": "Claude AI",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/freelang-io/freelang-compiler.git",
+    "directory": "packages/stdlib"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "express": "^5.2.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

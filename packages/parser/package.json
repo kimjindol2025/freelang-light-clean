@@ -1,0 +1,19 @@
+{
+  "name": "@freelang/parser",
+  "version": "2.9.1",
+  "description": "FreeLang Parser - Syntax analyzer and AST generator",
+  "main": "../../dist/src/parser/parser.js",
+  "types": "../../dist/src/parser/parser.d.ts",
+  "keywords": ["freelang", "parser", "compiler", "ast", "lexer"],
+  "author": "Claude AI",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/freelang-io/freelang-compiler.git",
+    "directory": "packages/parser"
+  },
+  "dependencies": {},
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

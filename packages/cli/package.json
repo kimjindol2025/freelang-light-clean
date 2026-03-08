@@ -1,0 +1,24 @@
+{
+  "name": "@freelang/cli",
+  "version": "2.9.1",
+  "description": "FreeLang CLI - Command-line interface for FreeLang compiler",
+  "main": "../../dist/src/cli/index.js",
+  "types": "../../dist/src/cli/index.d.ts",
+  "bin": {
+    "freelang": "../../bin/freelang"
+  },
+  "keywords": ["freelang", "cli", "compiler", "command-line"],
+  "author": "Claude AI",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/freelang-io/freelang-compiler.git",
+    "directory": "packages/cli"
+  },
+  "dependencies": {
+    "chalk": "^4.1.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

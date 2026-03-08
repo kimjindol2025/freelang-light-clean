@@ -1,0 +1,25 @@
+{
+  "name": "@freelang/lsp",
+  "version": "2.9.1",
+  "description": "FreeLang LSP Server - Language Server Protocol support for editors",
+  "main": "../../dist/src/lsp/server.js",
+  "types": "../../dist/src/lsp/server.d.ts",
+  "bin": {
+    "freelang-lsp": "../../dist/src/lsp/server.js"
+  },
+  "keywords": ["freelang", "lsp", "language-server", "vscode", "editor"],
+  "author": "Claude AI",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/freelang-io/freelang-compiler.git",
+    "directory": "packages/lsp"
+  },
+  "dependencies": {
+    "vscode-languageserver": "^8.1.0",
+    "vscode-languageserver-textdocument": "^1.0.12"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
