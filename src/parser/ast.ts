@@ -118,7 +118,7 @@ export interface LambdaExpression {
   type: 'lambda';
   params: Parameter[];        // Parameter definitions
   paramTypes?: string[];      // Optional type annotations for params
-  body: Expression;           // Lambda body expression
+  body: Expression | BlockStatement;  // B6 수정: BlockStatement 지원
   returnType?: string;        // Optional return type annotation
   capturedVars?: string[];    // Variables captured from enclosing scope
 }
@@ -204,13 +204,17 @@ export interface LintConfig {
  * Rust 스타일의 match 표현식 지원
  */
 
-// Pattern 타입 (5가지 패턴)
+// Pattern 타입 (Phase 2: Result/Option 패턴 추가)
 export type Pattern =
   | LiteralPattern
   | VariablePattern
   | WildcardPattern
   | StructPattern
-  | ArrayPattern;
+  | ArrayPattern
+  | OkPattern
+  | ErrPattern
+  | SomePattern
+  | NonePattern;
 
 export interface LiteralPattern {
   type: 'literal';
@@ -234,6 +238,26 @@ export interface StructPattern {
 export interface ArrayPattern {
   type: 'array';
   elements: Pattern[];
+}
+
+// Phase 2: Result/Option Patterns
+export interface OkPattern {
+  type: 'ok_pattern';
+  inner: Pattern;
+}
+
+export interface ErrPattern {
+  type: 'err_pattern';
+  inner: Pattern;
+}
+
+export interface SomePattern {
+  type: 'some_pattern';
+  inner: Pattern;
+}
+
+export interface NonePattern {
+  type: 'none_pattern';
 }
 
 // Match arm (패턴 → 표현식)

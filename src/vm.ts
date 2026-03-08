@@ -50,6 +50,7 @@ export class VM {
   private nextCallbackId = 0;
   private functionRegistry?: FunctionRegistry;  // Phase 19: user-defined functions
   private currentScope?: LocalScope;  // Phase 19: variable scoping
+  private currentLambda?: any;  // B7 수정: 현재 구성 중인 lambda 객체
   private typeChecker = new FunctionTypeChecker();  // Phase 21: type-safe execution
   private typeWarnings: TypeWarning[] = [];  // Phase 21: track type warnings
   private nativeFunctionRegistry = new NativeFunctionRegistry();  // Phase 3: FFI native functions
@@ -1217,10 +1218,133 @@ export class VM {
         break;
       }
 
-      // ── Lambda / Closure Metadata (파서가 클로저 객체로 처리, VM에서 skip) ──
-      case Op.LAMBDA_NEW:
-      case Op.LAMBDA_CAPTURE:
-      case Op.LAMBDA_SET_BODY:
+      // ── Result/Option Type Operators (Phase 2) ──
+      case Op.WRAP_OK: {
+        // stack: [value] → [{ tag: 'ok', val: value }]
+        const value = this.stack.pop();
+        this.guardStack();
+        this.stack.push({ tag: 'ok', val: value });
+        this.pc++;
+        break;
+      }
+
+      case Op.WRAP_ERR: {
+        // stack: [error] → [{ tag: 'err', val: error }]
+        const error = this.stack.pop();
+        this.guardStack();
+        this.stack.push({ tag: 'err', val: error });
+        this.pc++;
+        break;
+      }
+
+      case Op.WRAP_SOME: {
+        // stack: [value] → [{ tag: 'some', val: value }]
+        const value = this.stack.pop();
+        this.guardStack();
+        this.stack.push({ tag: 'some', val: value });
+        this.pc++;
+        break;
+      }
+
+      case Op.WRAP_NONE: {
+        // stack: [] → [{ tag: 'none' }]
+        this.guardStack();
+        this.stack.push({ tag: 'none' });
+        this.pc++;
+        break;
+      }
+
+      case Op.IS_OK: {
+        // stack: [result] → [bool]
+        const value = this.stack.pop();
+        this.guardStack();
+        this.stack.push(value?.tag === 'ok');
+        this.pc++;
+        break;
+      }
+
+      case Op.IS_ERR: {
+        // stack: [result] → [bool]
+        const value = this.stack.pop();
+        this.guardStack();
+        this.stack.push(value?.tag === 'err');
+        this.pc++;
+        break;
+      }
+
+      case Op.IS_SOME: {
+        // stack: [option] → [bool]
+        const value = this.stack.pop();
+        this.guardStack();
+        this.stack.push(value?.tag === 'some');
+        this.pc++;
+        break;
+      }
+
+      case Op.IS_NONE: {
+        // stack: [option] → [bool]
+        const value = this.stack.pop();
+        this.guardStack();
+        this.stack.push(value?.tag === 'none');
+        this.pc++;
+        break;
+      }
+
+      case Op.UNWRAP: {
+        // stack: [result/option] → [value] or throw
+        const value = this.stack.pop();
+        if (value?.tag === 'ok' || value?.tag === 'some') {
+          this.guardStack();
+          this.stack.push(value.val);
+        } else if (value?.tag === 'none') {
+          throw new Error('panic:unwrap_on_none');
+        } else if (value?.tag === 'err') {
+          throw new Error('panic:unwrap_on_err:' + String(value.val));
+        } else {
+          throw new Error('panic:unwrap_on_non_result');
+        }
+        this.pc++;
+        break;
+      }
+
+      // ── Lambda / Closure Metadata (B2 수정: 실제 구현) ──
+      case Op.LAMBDA_NEW: {
+        // B2.1: 새로운 lambda 객체 시작
+        this.currentLambda = {
+          type: 'lambda',
+          capturedVars: [],
+          params: [],
+          body: null,
+          sub: []
+        };
+        this.pc++;
+        break;
+      }
+
+      case Op.LAMBDA_CAPTURE: {
+        // B2.2: 클로저 변수 캡처
+        const varName = inst.arg as string;
+        if (this.currentLambda && this.vars.has(varName)) {
+          this.currentLambda.capturedVars.push(varName);
+          // 변수 값도 스냅샷으로 저장
+          this.currentLambda[varName] = this.vars.get(varName);
+        }
+        this.pc++;
+        break;
+      }
+
+      case Op.LAMBDA_SET_BODY: {
+        // B2.3: Lambda body 완성 및 스택에 push (B5도 함께 해결)
+        if (this.currentLambda) {
+          this.currentLambda.params = inst.params || [];
+          this.currentLambda.sub = inst.sub || [];
+          this.stack.push(this.currentLambda);
+          this.currentLambda = null;
+        }
+        this.pc++;
+        break;
+      }
+
       case Op.FUNC_DEF:
       case Op.COMMENT:
         this.pc++;
@@ -1371,11 +1495,13 @@ export class VM {
     const savedVars = this.vars;
     this.vars = new Map(savedVars);
 
-    // If closure has captured variables, restore them
+    // If closure has captured variables, restore them (B4 수정: string[] 처리)
     if (closure.capturedVars && Array.isArray(closure.capturedVars)) {
-      for (const capturedVar of closure.capturedVars) {
-        if (capturedVar.name && savedVars.has(capturedVar.name)) {
-          this.vars.set(capturedVar.name, savedVars.get(capturedVar.name));
+      for (const varName of closure.capturedVars) {
+        // varName은 string이므로 직접 사용
+        const name = typeof varName === 'string' ? varName : (varName as any).name;
+        if (name && savedVars.has(name)) {
+          this.vars.set(name, savedVars.get(name));
         }
       }
     }

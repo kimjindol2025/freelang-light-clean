@@ -141,6 +141,17 @@ export enum Op {
 
   // Debug (AI reads structured output)
   DUMP      = 0xF0,
+
+  // Result/Option Types (Phase 2: Algebraic Sum Types) - 0xF1-0xF9
+  WRAP_OK   = 0xF1,   // stack: [value] → [Ok(value)]
+  WRAP_ERR  = 0xF2,   // stack: [value] → [Err(value)]
+  WRAP_SOME = 0xF3,   // stack: [value] → [Some(value)]
+  WRAP_NONE = 0xF4,   // stack: [] → [None]
+  IS_OK     = 0xF5,   // stack: [result] → [bool]
+  IS_ERR    = 0xF6,   // stack: [result] → [bool]
+  IS_SOME   = 0xF7,   // stack: [option] → [bool]
+  IS_NONE   = 0xF8,   // stack: [option] → [bool]
+  UNWRAP    = 0xF9,   // stack: [result/option] → [value] or throw
 }
 
 // ── IR Instruction ──────────────────────────────────────────

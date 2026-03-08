@@ -1,0 +1,17 @@
+// 기본 클로저 테스트
+let x = 10;
+let add = fn(n) -> x + n;
+print(add(5)); // 기대: 15
+
+// 고차 함수 + 클로저
+fn makeCounter() {
+  let count = 0;
+  return fn() -> {
+    count = count + 1;
+    count
+  };
+}
+
+let c = makeCounter();
+print(c()); // 기대: 1
+print(c()); // 기대: 2

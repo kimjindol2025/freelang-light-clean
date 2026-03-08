@@ -4618,4 +4618,120 @@ async function run(){
       return result;
     }
   });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Phase 2: Result/Option Type Constructors
+  // ─────────────────────────────────────────────────────────────────────────
+
+  registry.register({
+    name: 'Ok',
+    module: 'result',
+    signature: {
+      name: 'Ok',
+      returnType: 'Result<T, E>',
+      parameters: [{ name: 'value', type: 'any' }],
+      category: 'type'
+    },
+    executor: (args) => {
+      return { tag: 'ok', val: args[0] };
+    }
+  });
+
+  registry.register({
+    name: 'Err',
+    module: 'result',
+    signature: {
+      name: 'Err',
+      returnType: 'Result<T, E>',
+      parameters: [{ name: 'error', type: 'any' }],
+      category: 'type'
+    },
+    executor: (args) => {
+      return { tag: 'err', val: args[0] };
+    }
+  });
+
+  registry.register({
+    name: 'Some',
+    module: 'option',
+    signature: {
+      name: 'Some',
+      returnType: 'Option<T>',
+      parameters: [{ name: 'value', type: 'any' }],
+      category: 'type'
+    },
+    executor: (args) => {
+      return { tag: 'some', val: args[0] };
+    }
+  });
+
+  registry.register({
+    name: 'None',
+    module: 'option',
+    signature: {
+      name: 'None',
+      returnType: 'Option<T>',
+      parameters: [],
+      category: 'type'
+    },
+    executor: (_args) => {
+      return { tag: 'none' };
+    }
+  });
+
+  registry.register({
+    name: 'isOk',
+    module: 'result',
+    signature: {
+      name: 'isOk',
+      returnType: 'bool',
+      parameters: [{ name: 'result', type: 'any' }],
+      category: 'type'
+    },
+    executor: (args) => {
+      return (args[0] as any)?.tag === 'ok';
+    }
+  });
+
+  registry.register({
+    name: 'isErr',
+    module: 'result',
+    signature: {
+      name: 'isErr',
+      returnType: 'bool',
+      parameters: [{ name: 'result', type: 'any' }],
+      category: 'type'
+    },
+    executor: (args) => {
+      return (args[0] as any)?.tag === 'err';
+    }
+  });
+
+  registry.register({
+    name: 'isSome',
+    module: 'option',
+    signature: {
+      name: 'isSome',
+      returnType: 'bool',
+      parameters: [{ name: 'option', type: 'any' }],
+      category: 'type'
+    },
+    executor: (args) => {
+      return (args[0] as any)?.tag === 'some';
+    }
+  });
+
+  registry.register({
+    name: 'isNone',
+    module: 'option',
+    signature: {
+      name: 'isNone',
+      returnType: 'bool',
+      parameters: [{ name: 'option', type: 'any' }],
+      category: 'type'
+    },
+    executor: (args) => {
+      return (args[0] as any)?.tag === 'none';
+    }
+  });
 }

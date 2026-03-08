@@ -911,6 +911,7 @@ export class FunctionTypeChecker {
 
       // Collect closure variables (variables from outer scope used in body)
       const capturedVars = this.collectClosureVariables(lambda.body, context, lambda.params.map((p: any) => p.name));
+      lambda.capturedVars = capturedVars; // B1 수정: AST에 capturedVars 전파
 
       // Construct function type: fn(T, U) -> V
       const functionType = `fn(${paramTypes.join(', ')}) -> ${bodyType}`;

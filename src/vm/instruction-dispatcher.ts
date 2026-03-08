@@ -157,6 +157,17 @@ export class InstructionDispatcher {
     this.handlers.set(Op.STORE_SECRET, this.handleStoreSecret);
     this.handlers.set(Op.LOAD_SECRET, this.handleLoadSecret);
 
+    // Result/Option Types (Phase 2)
+    this.handlers.set(Op.WRAP_OK, this.handleWrapOk);
+    this.handlers.set(Op.WRAP_ERR, this.handleWrapErr);
+    this.handlers.set(Op.WRAP_SOME, this.handleWrapSome);
+    this.handlers.set(Op.WRAP_NONE, this.handleWrapNone);
+    this.handlers.set(Op.IS_OK, this.handleIsOk);
+    this.handlers.set(Op.IS_ERR, this.handleIsErr);
+    this.handlers.set(Op.IS_SOME, this.handleIsSome);
+    this.handlers.set(Op.IS_NONE, this.handleIsNone);
+    this.handlers.set(Op.UNWRAP, this.handleUnwrap);
+
     // Debug
     this.handlers.set(Op.DUMP, this.handleDump);
   }
@@ -565,18 +576,40 @@ export class InstructionDispatcher {
   };
 
   // ──────────────────────────────────────────────────────────────
-  // Lambda Handlers (stubs)
+  // Lambda Handlers (B3 수정: 실제 구현)
   // ──────────────────────────────────────────────────────────────
 
-  private handleLambdaNew = (ctx: DispatcherContext): void => {
+  private handleLambdaNew = (ctx: DispatcherContext, inst: Inst): void => {
+    // B3.1: 새로운 lambda 객체 시작
+    (ctx as any).currentLambda = {
+      type: 'lambda',
+      capturedVars: [],
+      params: [],
+      body: null,
+      sub: []
+    };
     ctx.pc++;
   };
 
-  private handleLambdaCapture = (ctx: DispatcherContext): void => {
+  private handleLambdaCapture = (ctx: DispatcherContext, inst: Inst): void => {
+    // B3.2: 클로저 변수 캡처
+    const varName = inst.arg as string;
+    if ((ctx as any).currentLambda && ctx.vars.has(varName)) {
+      (ctx as any).currentLambda.capturedVars.push(varName);
+      // 변수 값도 스냅샷으로 저장
+      (ctx as any).currentLambda[varName] = ctx.vars.get(varName);
+    }
     ctx.pc++;
   };
 
-  private handleLambdaSetBody = (ctx: DispatcherContext): void => {
+  private handleLambdaSetBody = (ctx: DispatcherContext, inst: Inst): void => {
+    // B3.3: Lambda body 완성 및 스택에 push
+    if ((ctx as any).currentLambda) {
+      (ctx as any).currentLambda.params = inst.params || [];
+      (ctx as any).currentLambda.sub = inst.sub || [];
+      ctx.stack.push((ctx as any).currentLambda);
+      (ctx as any).currentLambda = null;
+    }
     ctx.pc++;
   };
 
@@ -710,6 +743,88 @@ export class InstructionDispatcher {
     }
     ctx.guardStack();
     ctx.stack.push(value);
+    ctx.pc++;
+  };
+
+  // ──────────────────────────────────────────────────────────────
+  // Result/Option Handlers (Phase 2)
+  // ──────────────────────────────────────────────────────────────
+
+  private handleWrapOk = (ctx: DispatcherContext): void => {
+    ctx.need(1);
+    const value = ctx.stack.pop();
+    ctx.guardStack();
+    ctx.stack.push({ tag: 'ok', val: value });
+    ctx.pc++;
+  };
+
+  private handleWrapErr = (ctx: DispatcherContext): void => {
+    ctx.need(1);
+    const error = ctx.stack.pop();
+    ctx.guardStack();
+    ctx.stack.push({ tag: 'err', val: error });
+    ctx.pc++;
+  };
+
+  private handleWrapSome = (ctx: DispatcherContext): void => {
+    ctx.need(1);
+    const value = ctx.stack.pop();
+    ctx.guardStack();
+    ctx.stack.push({ tag: 'some', val: value });
+    ctx.pc++;
+  };
+
+  private handleWrapNone = (ctx: DispatcherContext): void => {
+    ctx.guardStack();
+    ctx.stack.push({ tag: 'none' });
+    ctx.pc++;
+  };
+
+  private handleIsOk = (ctx: DispatcherContext): void => {
+    ctx.need(1);
+    const value = ctx.stack.pop();
+    ctx.guardStack();
+    ctx.stack.push(value?.tag === 'ok');
+    ctx.pc++;
+  };
+
+  private handleIsErr = (ctx: DispatcherContext): void => {
+    ctx.need(1);
+    const value = ctx.stack.pop();
+    ctx.guardStack();
+    ctx.stack.push(value?.tag === 'err');
+    ctx.pc++;
+  };
+
+  private handleIsSome = (ctx: DispatcherContext): void => {
+    ctx.need(1);
+    const value = ctx.stack.pop();
+    ctx.guardStack();
+    ctx.stack.push(value?.tag === 'some');
+    ctx.pc++;
+  };
+
+  private handleIsNone = (ctx: DispatcherContext): void => {
+    ctx.need(1);
+    const value = ctx.stack.pop();
+    ctx.guardStack();
+    ctx.stack.push(value?.tag === 'none');
+    ctx.pc++;
+  };
+
+  private handleUnwrap = (ctx: DispatcherContext): void => {
+    ctx.need(1);
+    const value = ctx.stack.pop();
+    if (value?.tag === 'ok' || value?.tag === 'some') {
+      ctx.guardStack();
+      ctx.stack.push(value.val);
+    } else if (value?.tag === 'none') {
+      ctx.fail(Op.UNWRAP, 5, 'panic:unwrap_on_none');
+    } else if (value?.tag === 'err') {
+      ctx.fail(Op.UNWRAP, 5, 'panic:unwrap_on_err:' + String(value.val));
+    } else {
+      ctx.fail(Op.UNWRAP, 5, 'panic:unwrap_on_non_result');
+    }
     ctx.pc++;
   };
 }

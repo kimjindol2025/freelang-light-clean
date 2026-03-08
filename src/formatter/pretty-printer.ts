@@ -419,7 +419,10 @@ export class FreeLangPrettyPrinter {
       })
       .join(', ');
     const ret = expr.returnType ? ` -> ${expr.returnType}` : '';
-    const body = this.printExpr(expr.body);
+    // B6 지원: BlockStatement 처리
+    const body = (expr.body as any).type === 'block'
+      ? `{ /* block */ }`
+      : this.printExpr(expr.body as any);
     return `(${params})${ret} => ${body}`;
   }
 

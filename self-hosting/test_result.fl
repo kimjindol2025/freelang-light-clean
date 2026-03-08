@@ -1,0 +1,44 @@
+// Result<T, E> 타입 테스트
+
+fn divide(a, b) {
+  if b == 0 {
+    return Err("division by zero");
+  }
+  return Ok(a / b);
+}
+
+// 성공 케이스
+let r = divide(10, 2);
+match r {
+  Ok(v) => print(v),      // 기대: 5
+  Err(e) => print(e),
+}
+
+// 실패 케이스
+let r2 = divide(10, 0);
+match r2 {
+  Ok(v) => print(v),
+  Err(e) => print(e),     // 기대: division by zero
+}
+
+// Option<T> 테스트
+fn find_first_even(arr) {
+  for item in arr {
+    if item % 2 == 0 {
+      return Some(item);
+    }
+  }
+  return None();
+}
+
+let result = find_first_even([1, 3, 4, 5]);
+match result {
+  Some(v) => print(v),    // 기대: 4
+  None => print("not found"),
+}
+
+let result2 = find_first_even([1, 3, 5]);
+match result2 {
+  Some(v) => print(v),
+  None => print("not found"),  // 기대: not found
+}
