@@ -601,6 +601,12 @@ export class IRGenerator {
         this.generateLambdaIR(node, out);
         break;
 
+      // ── Phase 2 Step 5: Match Expression (Pattern Matching) ────
+      case 'match':
+      case 'MatchExpression':
+        this.generateMatchIR(node, out);
+        break;
+
       // ── Function Call ───────────────────────────────────────
       case 'CallExpression':
       case 'call':
@@ -1543,6 +1549,116 @@ export class IRGenerator {
       sub: bodyInstructions,
       params: paramNames  // Include parameter names for VM to bind
     });
+  }
+
+  /**
+   * Phase 2 Step 5: Generate IR for match expression (pattern matching)
+   * Handles Result<T,E> and Option<T> pattern matching
+   */
+  private generateMatchIR(match: any, out: Inst[]): void {
+    // Structure:
+    // 1. Evaluate scrutinee (the value being matched)
+    // 2. For each arm:
+    //    a. Test pattern using IS_OK/IS_ERR/IS_SOME/IS_NONE
+    //    b. If matches, bind variables and execute body
+    //    c. Jump to end of match
+    // 3. If no arms matched, fall through
+
+    // 1. Evaluate scrutinee
+    this.traverse(match.scrutinee, out);
+    const scrutineeVar = `_match_scrutinee_${this.indexVarCounter++}`;
+    out.push({ op: Op.STORE, arg: scrutineeVar });
+
+    // Generate labels for each arm
+    const armLabels: number[] = [];
+    const jumpOutIndices: number[] = [];
+
+    // 2. Process each match arm
+    if (match.arms && Array.isArray(match.arms)) {
+      for (let i = 0; i < match.arms.length; i++) {
+        const arm = match.arms[i];
+        const pattern = arm.pattern;
+
+        // Load scrutinee for pattern test
+        out.push({ op: Op.LOAD, arg: scrutineeVar });
+
+        // Test pattern and jump if not matched
+        const patternTestIdx = this.generatePatternTest(pattern, out);
+        const jumpIfNotIdx = out.length;
+        out.push({ op: Op.JMP_NOT, arg: 0 }); // Patch later
+
+        // Pattern matched: bind variables if needed
+        if (pattern && pattern.type && pattern.inner && pattern.inner.name) {
+          // Extract inner value and bind to variable
+          out.push({ op: Op.LOAD, arg: scrutineeVar });
+          out.push({ op: Op.UNWRAP }); // Unwrap Ok/Some value
+          out.push({ op: Op.STORE, arg: pattern.inner.name });
+        }
+
+        // Execute arm body
+        this.traverse(arm.body, out);
+
+        // Jump to end of match
+        jumpOutIndices.push(out.length);
+        out.push({ op: Op.JMP, arg: 0 }); // Patch later
+
+        // Patch the "jump if not matched" instruction
+        out[jumpIfNotIdx].arg = out.length;
+      }
+    }
+
+    // Patch all "jump to end" instructions
+    const matchEndIdx = out.length;
+    for (const jumpIdx of jumpOutIndices) {
+      out[jumpIdx].arg = matchEndIdx;
+    }
+  }
+
+  /**
+   * Generate pattern test bytecode
+   * Returns index of IS_* opcode for VM to check
+   */
+  private generatePatternTest(pattern: any, out: Inst[]): number {
+    if (!pattern) return out.length;
+
+    const testIdx = out.length;
+
+    // Test based on pattern type
+    switch (pattern.type) {
+      case 'ok_pattern':
+        out.push({ op: Op.IS_OK });
+        break;
+      case 'err_pattern':
+        out.push({ op: Op.IS_ERR });
+        break;
+      case 'some_pattern':
+        out.push({ op: Op.IS_SOME });
+        break;
+      case 'none_pattern':
+        out.push({ op: Op.IS_NONE });
+        break;
+      case 'literal':
+      case 'LiteralPattern':
+        // For literal patterns, test equality
+        this.traverse(pattern.value, out);
+        out.push({ op: Op.EQ });
+        break;
+      case 'identifier':
+      case 'VariablePattern':
+        // Variable patterns always match, push true
+        out.push({ op: Op.PUSH, arg: 1 }); // true
+        break;
+      case 'wildcard':
+      case 'WildcardPattern':
+        // Wildcard always matches, push true
+        out.push({ op: Op.PUSH, arg: 1 }); // true
+        break;
+      default:
+        // Default: assume pattern matches (true)
+        out.push({ op: Op.PUSH, arg: 1 });
+    }
+
+    return testIdx;
   }
 
   /**
