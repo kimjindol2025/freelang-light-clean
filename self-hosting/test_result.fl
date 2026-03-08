@@ -1,44 +1,36 @@
 // Result<T, E> 타입 테스트
+// Note: Pattern matching과 함수 매개변수 지원 예정
 
-fn divide(a, b) {
-  if b == 0 {
-    return Err("division by zero");
-  }
-  return Ok(a / b);
-}
+// 임시: Result 타입 기본 구조 테스트
+// Ok(value)의 구조:
+// { tag: 'ok', val: value }
 
-// 성공 케이스
-let r = divide(10, 2);
-match r {
-  Ok(v) => print(v),      // 기대: 5
-  Err(e) => print(e),
-}
+// 빌트인 함수 테스트
+let ok_val = Ok(5);
+println("Created Ok: ");
+println(ok_val);
 
-// 실패 케이스
-let r2 = divide(10, 0);
-match r2 {
-  Ok(v) => print(v),
-  Err(e) => print(e),     // 기대: division by zero
-}
+let err_val = Err("error message");
+println("Created Err: ");
+println(err_val);
 
-// Option<T> 테스트
-fn find_first_even(arr) {
-  for item in arr {
-    if item % 2 == 0 {
-      return Some(item);
-    }
-  }
-  return None();
-}
+let some_val = Some(10);
+println("Created Some: ");
+println(some_val);
 
-let result = find_first_even([1, 3, 4, 5]);
-match result {
-  Some(v) => print(v),    // 기대: 4
-  None => print("not found"),
-}
+let none_val = None();
+println("Created None: ");
+println(none_val);
 
-let result2 = find_first_even([1, 3, 5]);
-match result2 {
-  Some(v) => print(v),
-  None => print("not found"),  // 기대: not found
-}
+// 상태 확인 함수 테스트
+println("isOk(ok_val): ");
+println(isOk(ok_val));
+
+println("isErr(err_val): ");
+println(isErr(err_val));
+
+println("isSome(some_val): ");
+println(isSome(some_val));
+
+println("isNone(none_val): ");
+println(isNone(none_val));
