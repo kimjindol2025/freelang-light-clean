@@ -119,7 +119,7 @@ function matchesSelector(node: DomNode, selector: string): boolean {
       const [k, v] = attr.split('=');
       return node.attribs?.[k.trim()] === v.trim().replace(/['"]/g, '');
     }
-    return k => node.attribs?.[attr] !== undefined;
+    return node.attribs?.[attr] !== undefined;
   }
   return false;
 }

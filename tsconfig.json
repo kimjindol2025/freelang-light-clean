@@ -4,7 +4,7 @@
     "module": "commonjs",
     "lib": ["ES2021", "DOM", "WebWorker"],
     "outDir": "./dist",
-    "rootDir": "./",
+    "rootDir": "./src",
     "strict": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -19,7 +19,7 @@
     "allowUnusedLabels": true,
     "allowUnreachableCode": true
   },
-  "include": ["src", "rt"],
+  "include": ["src"],
   "exclude": [
     "node_modules",
     "dist",
@@ -29,7 +29,6 @@
     "src/ffi/c-function-caller.ts",
     "src/stdlib-log-streamer.ts",
     "src/stdlib-native-request-recorder.ts",
-    "src/stdlib/vault.ts",
-    "src/stdlib/sqlite-native.ts"
+    "src/stdlib/vault.ts"
   ]
 }

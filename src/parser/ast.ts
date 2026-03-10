@@ -461,7 +461,7 @@ export interface IfStatement {
   type: 'if';
   condition: Expression;
   consequent: BlockStatement;
-  alternate?: BlockStatement;
+  alternate?: BlockStatement | IfStatement;
 }
 
 export interface ForStatement {

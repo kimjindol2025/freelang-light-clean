@@ -262,6 +262,44 @@ export class Parser {
   }
 
   /**
+   * 키워드를 식별자로 허용하는 집합
+   * 함수명/파라미터명/변수명 등으로 키워드 사용 가능하게
+   */
+  private static readonly KEYWORD_IDENT_TYPES = new Set([
+    TokenType.FROM, TokenType.IMPORT, TokenType.EXPORT, TokenType.AS,
+    TokenType.IN, TokenType.OF, TokenType.IS, TokenType.PUB, TokenType.MUT,
+    TokenType.SELF, TokenType.SUPER, TokenType.IMPL,
+    TokenType.TYPE, TokenType.TRAIT, TokenType.STRUCT, TokenType.ENUM,
+    TokenType.INPUT, TokenType.OUTPUT, TokenType.INTENT,
+    TokenType.TEST, TokenType.SCHEMA, TokenType.QUERY,
+    TokenType.SECRET, TokenType.ASYNC, TokenType.AWAIT,
+    TokenType.LOOP, TokenType.BREAK, TokenType.CONTINUE,
+    TokenType.NULL, TokenType.TRUE, TokenType.FALSE,
+  ]);
+
+  /**
+   * 현재 토큰이 식별자 또는 식별자로 허용된 키워드인지 확인
+   */
+  private isIdentLike(): boolean {
+    const t = this.current().type;
+    return t === TokenType.IDENT || Parser.KEYWORD_IDENT_TYPES.has(t as TokenType);
+  }
+
+  /**
+   * 식별자 또는 식별자로 허용된 키워드를 소비하고 반환
+   */
+  private expectIdent(message?: string): Token {
+    if (!this.isIdentLike()) {
+      const token = this.current();
+      throw new ParseError(token.line, token.column,
+        message || `Expected identifier, got ${token.type}`);
+    }
+    const token = this.current();
+    this.advance();
+    return token;
+  }
+
+  /**
    * 예상 토큰 확인, 없으면 에러
    */
   private expect(type: TokenType, message?: string): Token {
@@ -1082,8 +1120,8 @@ export class Parser {
     if (process.env.DEBUG_PARSER) console.log(`[parseFnDecl] Starting (async=${isAsync})`);
     this.expect(TokenType.FN);
 
-    // Function name
-    const nameToken = this.expect(TokenType.IDENT, 'Expected function name');
+    // Function name (키워드도 함수명으로 허용: test, from, query 등)
+    const nameToken = this.expectIdent('Expected function name');
     const name = nameToken.value;
     if (process.env.DEBUG_PARSER) console.log(`[parseFnDecl] name=${name}`);
 
@@ -1109,7 +1147,7 @@ export class Parser {
 
     if (!this.check(TokenType.RPAREN)) {
       do {
-        const paramName = this.expect(TokenType.IDENT, 'Expected parameter name');
+        const paramName = this.expectIdent('Expected parameter name');
         let paramType: string | undefined;
         // Self-Formatting Compiler: 파라미터 타입 어노테이션 지원 (name: type)
         if (this.check(TokenType.COLON)) {
@@ -1182,8 +1220,8 @@ export class Parser {
       }
     }
 
-    // Parse function name
-    const nameToken = this.expect(TokenType.IDENT, 'Expected function name');
+    // Parse function name (키워드도 허용)
+    const nameToken = this.expectIdent('Expected function name');
     const fnName = nameToken.value;
 
     // Phase 5 Task 5: Parse type parameters (fn foo<T, U>(...))
@@ -1348,6 +1386,20 @@ export class Parser {
   private parseAssignment(): Expression {
     let left = this.parseLogical();
 
+    // 삼항 연산자: cond ? then : else
+    if (this.check(TokenType.QUESTION)) {
+      this.advance(); // consume ?
+      const consequent = this.parseExpression();
+      this.expect(TokenType.COLON, 'Expected ":" in ternary expression');
+      const alternate = this.parseExpression();
+      return {
+        type: 'ternary',
+        condition: left,
+        consequent,
+        alternate
+      } as any;
+    }
+
     if (this.check(TokenType.ASSIGN)) {
       this.advance(); // consume =
       const right = this.parseAssignment(); // 우측 결합
@@ -1490,7 +1542,7 @@ export class Parser {
     while (this.check(TokenType.DOT) || this.check(TokenType.LBRACKET) || this.check(TokenType.LPAREN)) {
       if (this.check(TokenType.DOT)) {
         this.advance(); // consume .
-        const propName = this.expect(TokenType.IDENT, 'Expected property name').value;
+        const propName = this.expectIdent('Expected property name').value;
         left = {
           type: 'member',
           object: left,
@@ -1649,7 +1701,8 @@ export class Parser {
         if (this.check(TokenType.STRING)) {
           key = this.current().value;
           this.advance();
-        } else if (this.check(TokenType.IDENT)) {
+        } else if (this.isIdentLike()) {
+          // 키워드도 object key로 허용 (type, from, query 등)
           key = this.current().value;
           this.advance();
         } else {
@@ -1745,7 +1798,7 @@ export class Parser {
     const paramTypes: string[] = [];
 
     while (!this.check(TokenType.RPAREN) && !this.check(TokenType.EOF)) {
-      const paramName = this.expect(TokenType.IDENT, 'Expected parameter name').value;
+      const paramName = this.expectIdent('Expected parameter name').value;
 
       let paramType: string | undefined;
       if (this.match(TokenType.COLON)) {
@@ -2010,7 +2063,7 @@ export class Parser {
           isStruct = true;
 
           while (!this.check(TokenType.RBRACE) && !this.check(TokenType.EOF)) {
-            const fieldName = this.expect(TokenType.IDENT, 'Expected field name').value;
+            const fieldName = this.expectIdent('Expected field name').value;
             this.expect(TokenType.COLON, 'Expected ":"');
             const fieldPattern = this.parsePattern();
             fields[fieldName] = fieldPattern;
@@ -2216,7 +2269,7 @@ export class Parser {
     }
 
     // 변수 이름
-    const nameToken = this.expect(TokenType.IDENT, 'Expected variable name');
+    const nameToken = this.expectIdent('Expected variable name');
     const name = nameToken.value;
 
     // 선택적 타입 어노테이션 (: type)
@@ -2254,10 +2307,15 @@ export class Parser {
 
     const consequent = this.parseBlockStatement();
 
-    let alternate: BlockStatement | undefined;
+    let alternate: BlockStatement | IfStatement | undefined;
     if (this.check(TokenType.ELSE)) {
       this.advance();
-      alternate = this.parseBlockStatement();
+      if (this.check(TokenType.IF)) {
+        // else if → 재귀적 if 파싱
+        alternate = this.parseIfStatement();
+      } else {
+        alternate = this.parseBlockStatement();
+      }
     }
 
     return {
@@ -2291,7 +2349,7 @@ export class Parser {
     const isLet = this.match(TokenType.LET);
 
     // 변수 이름: for i
-    const variable = this.expect(TokenType.IDENT, 'Expected loop variable').value;
+    const variable = this.expectIdent('Expected loop variable').value;
 
     // 선택적 타입 어노테이션: for i: array<string>
     let variableType: string | undefined;
@@ -2612,8 +2670,8 @@ export class Parser {
     if (this.check(TokenType.FN)) {
       this.advance();  // fn 소비
 
-      // 함수 이름
-      const nameToken = this.expect(TokenType.IDENT, 'Expected function name');
+      // 함수 이름 (키워드도 허용)
+      const nameToken = this.expectIdent('Expected function name');
       const fnName = nameToken.value;
 
       // 매개변수 파싱
@@ -2644,7 +2702,7 @@ export class Parser {
       this.advance();  // let 소비
 
       // 변수 이름
-      const nameToken = this.expect(TokenType.IDENT, 'Expected variable name');
+      const nameToken = this.expectIdent('Expected variable name');
       const varName = nameToken.value;
 
       let varType: string | undefined;
@@ -2779,7 +2837,7 @@ export class Parser {
         }
       }
 
-      const fieldNameToken = this.expect(TokenType.IDENT, 'Expected field name');
+      const fieldNameToken = this.expectIdent('Expected field name');
       const fieldName = fieldNameToken.value;
 
       let fieldType: string | undefined;
@@ -2894,7 +2952,7 @@ export class Parser {
     let counter = 0;
 
     while (!this.check(TokenType.RBRACE) && !this.check(TokenType.EOF)) {
-      const fieldNameToken = this.expect(TokenType.IDENT, 'Expected enum field name');
+      const fieldNameToken = this.expectIdent('Expected enum field name');
       const fieldName = fieldNameToken.value;
 
       // 값 지정 (선택적)
@@ -2938,7 +2996,7 @@ export class Parser {
     const params: Parameter[] = [];
 
     while (!this.check(TokenType.RPAREN) && !this.check(TokenType.EOF)) {
-      const nameToken = this.expect(TokenType.IDENT, 'Expected parameter name');
+      const nameToken = this.expectIdent('Expected parameter name');
       const name = nameToken.value;
 
       let paramType: string | undefined;

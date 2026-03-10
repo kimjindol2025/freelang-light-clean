@@ -194,9 +194,14 @@ export class FreeLangPrettyPrinter {
     const ind = this.ind(depth);
     const cond = this.printExpr(stmt.condition);
     const cons = this.printBlock(stmt.consequent, depth);
-    const alt = stmt.alternate
-      ? ` else ${this.printBlock(stmt.alternate, depth)}`
-      : '';
+    let alt = '';
+    if (stmt.alternate) {
+      if (stmt.alternate.type === 'if') {
+        alt = ` else ${this.printIf(stmt.alternate as IfStatement, depth).trimStart()}`;
+      } else {
+        alt = ` else ${this.printBlock(stmt.alternate as BlockStatement, depth)}`;
+      }
+    }
     return `${ind}if ${cond} ${cons}${alt}`;
   }
 

@@ -12,6 +12,7 @@ import { Lexer } from '../lexer/lexer';
 import { TokenBuffer } from '../lexer/lexer';
 import { Parser } from '../parser/parser';
 import { IRGenerator } from '../codegen/ir-generator';
+import { Binder } from '../binder/binder';
 import { VM } from '../vm';
 import { FunctionRegistry } from '../parser/function-registry';
 import { Inst, VMResult } from '../types';
@@ -141,17 +142,22 @@ export class ProgramRunner {
       // 2.5. Phase 2: Register user-defined functions before execution
       // Extract FunctionStatements from module.statements and register them
       // DEBUG: Log module structure (disabled)
-      // console.log('[DEBUG] Module statements:', module.statements?.map((s: any) => ({ type: s.type, name: s.name })));
+      if (process.env.DEBUG_REG) console.log('[DEBUG] Module statements:', module.statements?.map((s: any) => ({ type: s.type, name: s.name })));
 
       if (module.statements) {
         for (const stmt of module.statements) {
           if (stmt && stmt.type === 'function') {
             const fn = stmt as any; // FunctionStatement
             // Register function in FunctionRegistry with params and body
+            const rawParams = fn.params || [];
+            const paramNames = rawParams.map((p: any) => typeof p === 'string' ? p : p?.name || p?.value || '').filter(Boolean);
+            if (process.env.DEBUG_REG) {
+              console.log(`[DEBUG REG] fn=${fn.name} rawParams=${JSON.stringify(rawParams)} → paramNames=${JSON.stringify(paramNames)}`);
+            }
             this.registry.register({
               type: 'FunctionDefinition',
               name: fn.name,
-              params: fn.params?.map((p: any) => p.name) || [],  // Extract param names
+              params: paramNames,  // Extract param names
               body: fn.body,  // BlockStatement
               annotations: fn.annotations || []  // Self-Monitoring Kernel: @monitor 등
             });
@@ -225,6 +231,23 @@ export class ProgramRunner {
           };
         }
         // Worker 프로세스: 아래로 통과 → main 정상 실행
+      }
+
+      // 2.9. Bind: Symbol table construction + variable validation
+      // Note: Binder is run for diagnostics only; errors are non-fatal (VM catches runtime errors)
+      const binder = new Binder();
+      const bindResult = binder.bind(module);
+      if (!bindResult.ok && process.env.STRICT_BIND) {
+        const errMsg = bindResult.errors
+          .map(e => e.line ? `${e.message} (line ${e.line})` : e.message)
+          .join('\n');
+        return {
+          success: false,
+          output: '',
+          error: `Binding Error:\n${errMsg}`,
+          exitCode: 1,
+          executionTime: Date.now() - startTime
+        };
       }
 
       // 3. Generate IR: Module → IR instructions

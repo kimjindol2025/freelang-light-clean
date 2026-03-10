@@ -28,7 +28,7 @@ import {
   CachedQueryConfig,
 } from './stdlib-native-query';
 
-const MAX_CYCLES = 100_000;
+const MAX_CYCLES = 10_000_000;
 const MAX_STACK  = 10_000;
 
 // ── Result<T, E> & Option<T> 타입 정의 ──

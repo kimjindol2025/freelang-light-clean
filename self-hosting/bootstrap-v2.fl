@@ -85,8 +85,8 @@ fn getKeywordType(word) {
 
 // ── Make token helper ──
 
-fn makeToken(type, value, line, col) {
-  return { type: type, value: value, line: line, column: col };
+fn makeToken(tp, val, ln, cl) {
+  return { type: tp, value: val, line: ln, column: cl };
 }
 
 // ── Main tokenizer ──

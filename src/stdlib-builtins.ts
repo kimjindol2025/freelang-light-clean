@@ -26,13 +26,10 @@ import { registerTeamFFunctions } from './stdlib-team-f-security';
 import { registerNativeChartFunctions } from './stdlib-chart';
 import { registerWebForgeFunctions } from './stdlib-web-forge';
 import { registerAuthFunctions } from './stdlib-auth';
-import { registerLogStreamerFunctions } from './stdlib-log-streamer';
 import { registerCspShieldFunctions } from './stdlib/csp-shield';
 import { registerNativeRequestStreamer } from './stdlib-native-request-streamer';
-import { globalRecorder, recorderPorts, registerNativeRequestRecorder } from './stdlib-native-request-recorder';
 import { registerAsyncOrchestratorFunctions } from './stdlib/async-orchestrator';
 import { registerNativeRequestValidator } from './stdlib/native-request-validator';
-import { registerVaultFunctions } from './stdlib/vault';
 import * as fs from 'fs';
 
 /**
@@ -680,20 +677,6 @@ export function registerStdlibFunctions(registry: NativeFunctionRegistry): void 
 
       // Set up request listener
       server.on('request', (req: any, res: any) => {
-        // Native-Request-Recorder: 요청 도착 시점 나노초 타임스탬프 (process.hrtime.bigint())
-        const __rec_t0 = process.hrtime.bigint();
-        if (recorderPorts.has(port)) {
-          res.on('finish', () => {
-            globalRecorder.push({
-              method:     req.method   || 'GET',
-              path:       (req.url || '/').split('?')[0],
-              status:     res.statusCode,
-              latencyNs:  process.hrtime.bigint() - __rec_t0,
-              contentLen: parseInt(String(res.getHeader('content-length') ?? '0'), 10) || 0,
-              ts:         __rec_t0,
-            });
-          });
-        }
         // Hardware-CORS Gate: Origin 검증 (애플리케이션 레이어 진입 전 차단)
         const origin: string = (req.headers['origin'] as string) || '';
         if (corsWhitelist.size > 0) {
@@ -4019,9 +4002,6 @@ export function registerStdlibFunctions(registry: NativeFunctionRegistry): void 
   // Native-Auth-Token: JWT 대체 HMAC-SHA256 토큰 발급/검증
   registerAuthFunctions(registry);
 
-  // Native-Log-Streamer: pm2-logrotate 대체 순환 로그 엔진
-  registerLogStreamerFunctions(registry);
-
   // Native-CSP-Shield: helmet-csp 대체 CSP 헤더 자동 주입
   registerCspShieldFunctions(registry);
 
@@ -4034,15 +4014,6 @@ export function registerStdlibFunctions(registry: NativeFunctionRegistry): void 
   // async_timeout, parallel_filter, parallel_reduce, async_map_batch,
   // work_stealing_stats - Work-Stealing 스케줄러 내장
   registerAsyncOrchestratorFunctions(registry);
-
-  // Native-Request-Recorder: morgan 대체 Zero-copy 비동기 HTTP 로거
-  // AsyncRingBuffer(1024) + writev 스타일 배치 write, 외부 라이브러리 0개
-  registerNativeRequestRecorder(registry);
-
-  // Native-JSON-Vault: lowdb 대체 로컬 JSON 영구 저장소
-  // WAL + atomic commit (tmp→rename), crash recovery 내장, 외부 라이브러리 0개
-  // vault_open/get/set/delete/keys/has/commit/rollback/close/stats
-  registerVaultFunctions(registry);
 
   // Native-Request-Validator: express-validator 대체
   // validate_schema_register/list/validate_request/validate_field/validate_email/
@@ -4630,7 +4601,7 @@ async function run(){
       name: 'Ok',
       returnType: 'Result<T, E>',
       parameters: [{ name: 'value', type: 'any' }],
-      category: 'type'
+      category: 'io'
     },
     executor: (args) => {
       return { tag: 'ok', val: args[0] };
@@ -4644,7 +4615,7 @@ async function run(){
       name: 'Err',
       returnType: 'Result<T, E>',
       parameters: [{ name: 'error', type: 'any' }],
-      category: 'type'
+      category: 'io'
     },
     executor: (args) => {
       return { tag: 'err', val: args[0] };
@@ -4658,7 +4629,7 @@ async function run(){
       name: 'Some',
       returnType: 'Option<T>',
       parameters: [{ name: 'value', type: 'any' }],
-      category: 'type'
+      category: 'io'
     },
     executor: (args) => {
       return { tag: 'some', val: args[0] };
@@ -4672,7 +4643,7 @@ async function run(){
       name: 'None',
       returnType: 'Option<T>',
       parameters: [],
-      category: 'type'
+      category: 'io'
     },
     executor: (_args) => {
       return { tag: 'none' };
@@ -4686,7 +4657,7 @@ async function run(){
       name: 'isOk',
       returnType: 'bool',
       parameters: [{ name: 'result', type: 'any' }],
-      category: 'type'
+      category: 'io'
     },
     executor: (args) => {
       return (args[0] as any)?.tag === 'ok';
@@ -4700,7 +4671,7 @@ async function run(){
       name: 'isErr',
       returnType: 'bool',
       parameters: [{ name: 'result', type: 'any' }],
-      category: 'type'
+      category: 'io'
     },
     executor: (args) => {
       return (args[0] as any)?.tag === 'err';
@@ -4714,7 +4685,7 @@ async function run(){
       name: 'isSome',
       returnType: 'bool',
       parameters: [{ name: 'option', type: 'any' }],
-      category: 'type'
+      category: 'io'
     },
     executor: (args) => {
       return (args[0] as any)?.tag === 'some';
@@ -4728,7 +4699,7 @@ async function run(){
       name: 'isNone',
       returnType: 'bool',
       parameters: [{ name: 'option', type: 'any' }],
-      category: 'type'
+      category: 'io'
     },
     executor: (args) => {
       return (args[0] as any)?.tag === 'none';

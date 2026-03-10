@@ -28,6 +28,7 @@ export class IRGenerator {
   private tempVarCounter = 0;   // For generating temporary array variables
   private moduleLinkContext?: ModuleLinkContext;  // Phase 4 Step 5: Module linking
   private localScope: Set<string> = new Set();  // Function parameter scope tracking
+  private loopStack: { start: number; breaks: number[] }[] = [];  // break/continue support
 
   /**
    * AST → IR instructions
@@ -168,6 +169,15 @@ export class IRGenerator {
     // Step 5: 모듈 본체 IR 생성
     for (const stmt of module.statements) {
       this.traverse(stmt, instructions);
+    }
+
+    // Step 5.5: main 함수가 있으면 자동 호출
+    const hasMain = module.statements.some(
+      (s: any) => s?.type === 'function' && s?.name === 'main'
+    );
+    if (hasMain) {
+      instructions.push({ op: Op.CALL, arg: 'main' });
+      instructions.push({ op: Op.POP });
     }
 
     // Step 6: HALT 추가
@@ -450,6 +460,25 @@ export class IRGenerator {
         }
         break;
 
+      // ── Ternary expression: cond ? then : else ──────────────
+      case 'ternary': {
+        // condition
+        this.traverse(node.condition, out);
+        const ternaryFalseIdx = out.length;
+        out.push({ op: Op.JMP_NOT, arg: 0 }); // placeholder: jump to else
+        // consequent (true branch)
+        this.traverse(node.consequent, out);
+        const ternaryEndIdx = out.length;
+        out.push({ op: Op.JMP, arg: 0 }); // placeholder: jump to end
+        // patch false jump to alternate
+        out[ternaryFalseIdx].arg = out.length;
+        // alternate (false branch)
+        this.traverse(node.alternate, out);
+        // patch end jump
+        out[ternaryEndIdx].arg = out.length;
+        break;
+      }
+
       // ── Variables ───────────────────────────────────────────
       case 'Identifier':
         out.push({ op: Op.LOAD, arg: node.name });
@@ -545,16 +574,46 @@ export class IRGenerator {
         }
         break;
 
-      case 'WhileStatement':
+      case 'WhileStatement': {
         const loopStart = out.length;
+        const loopCtx = { start: loopStart, breaks: [] as number[] };
+        this.loopStack.push(loopCtx);
+
         this.traverse(node.condition, out);
         const whileJmpIdx = out.length;
         out.push({ op: Op.JMP_NOT, arg: 0 }); // placeholder
 
         this.traverse(node.body, out);
         out.push({ op: Op.JMP, arg: loopStart });
-        out[whileJmpIdx].arg = out.length; // patch jump target
+        const loopEnd = out.length;
+        out[whileJmpIdx].arg = loopEnd; // patch jump target
+
+        // Patch all break jumps
+        for (const breakIdx of loopCtx.breaks) {
+          out[breakIdx].arg = loopEnd;
+        }
+        this.loopStack.pop();
         break;
+      }
+
+      case 'break':
+      case 'BreakStatement': {
+        if (this.loopStack.length > 0) {
+          const ctx = this.loopStack[this.loopStack.length - 1];
+          ctx.breaks.push(out.length);
+          out.push({ op: Op.JMP, arg: 0 }); // placeholder, patched at loop end
+        }
+        break;
+      }
+
+      case 'continue':
+      case 'ContinueStatement': {
+        if (this.loopStack.length > 0) {
+          const ctx = this.loopStack[this.loopStack.length - 1];
+          out.push({ op: Op.JMP, arg: ctx.start });
+        }
+        break;
+      }
 
       // ── Array Operations ────────────────────────────────────
       case 'ArrayLiteral':
