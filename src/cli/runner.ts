@@ -234,20 +234,22 @@ export class ProgramRunner {
       }
 
       // 2.9. Bind: Symbol table construction + variable validation
-      // Note: Binder is run for diagnostics only; errors are non-fatal (VM catches runtime errors)
-      const binder = new Binder();
-      const bindResult = binder.bind(module);
-      if (!bindResult.ok && process.env.STRICT_BIND) {
-        const errMsg = bindResult.errors
-          .map(e => e.line ? `${e.message} (line ${e.line})` : e.message)
-          .join('\n');
-        return {
-          success: false,
-          output: '',
-          error: `Binding Error:\n${errMsg}`,
-          exitCode: 1,
-          executionTime: Date.now() - startTime
-        };
+      // Only runs when STRICT_BIND is set to avoid unnecessary overhead
+      if (process.env.STRICT_BIND) {
+        const binder = new Binder();
+        const bindResult = binder.bind(module);
+        if (!bindResult.ok) {
+          const errMsg = bindResult.errors
+            .map(e => e.line ? `${e.message} (line ${e.line})` : e.message)
+            .join('\n');
+          return {
+            success: false,
+            output: '',
+            error: `Binding Error:\n${errMsg}`,
+            exitCode: 1,
+            executionTime: Date.now() - startTime
+          };
+        }
       }
 
       // 3. Generate IR: Module → IR instructions

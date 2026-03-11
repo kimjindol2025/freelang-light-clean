@@ -106,13 +106,20 @@ const BUILTIN_FUNCTIONS = new Set([
   'col_group_by', 'col_chunk', 'col_zip', 'col_range',
 ]);
 
+// ── Pre-built builtins scope (created once, reused across all bind() calls) ──
+const BUILTINS_SCOPE: Scope = {
+  kind: 'module',
+  parent: null,
+  symbols: new Map(
+    [...BUILTIN_FUNCTIONS].map(name => [name, { name, kind: 'builtin' as SymbolKind }])
+  ),
+};
+
 // ── Binder Class ──
 
 export class Binder {
   private errors: BindError[] = [];
   private warnings: BindError[] = [];
-  private symbolCount = 0;
-  private scopeCount = 0;
   private moduleScope!: Scope;
 
   /**
@@ -121,16 +128,9 @@ export class Binder {
   bind(module: any): BindResult {
     this.errors = [];
     this.warnings = [];
-    this.symbolCount = 0;
-    this.scopeCount = 0;
 
-    // Create module scope with builtins
-    this.moduleScope = this.createScope('module', null);
-
-    // Register built-in functions
-    for (const name of BUILTIN_FUNCTIONS) {
-      this.declareSymbol(this.moduleScope, name, 'builtin');
-    }
+    // Create module scope with builtins as parent (avoids re-registering 130+ symbols)
+    this.moduleScope = this.createScope('module', BUILTINS_SCOPE);
 
     // Phase 1: Collect all top-level declarations (hoisting)
     if (module.statements) {
@@ -148,19 +148,21 @@ export class Binder {
       }
     }
 
-    return {
+    const result: BindResult = {
       ok: this.errors.length === 0,
       errors: this.errors,
       warnings: this.warnings,
-      symbolCount: this.symbolCount,
-      scopeCount: this.scopeCount,
+      symbolCount: 0,
+      scopeCount: 0,
     };
+    // Release scope tree to allow GC
+    this.moduleScope = null as any;
+    return result;
   }
 
   // ── Scope Management ──
 
   private createScope(kind: Scope['kind'], parent: Scope | null, functionName?: string): Scope {
-    this.scopeCount++;
     return {
       kind,
       parent,
@@ -172,7 +174,14 @@ export class Binder {
   private declareSymbol(scope: Scope, name: string, kind: SymbolKind, declNode?: any): void {
     if (!name) return;
     scope.symbols.set(name, { name, kind, declNode });
-    this.symbolCount++;
+  }
+
+  private bindParams(params: any[] | undefined, scope: Scope): void {
+    if (!params) return;
+    for (const param of params) {
+      const name = typeof param === 'string' ? param : param?.name;
+      if (name) this.declareSymbol(scope, name, 'parameter', param);
+    }
   }
 
   private resolveSymbol(scope: Scope, name: string): BindSymbol | null {
@@ -218,19 +227,8 @@ export class Binder {
       case 'function': {
         // Function already declared in Phase 1 (hoisting)
         const fnScope = this.createScope('function', scope, node.name);
-        // Register parameters
-        if (node.params) {
-          for (const param of node.params) {
-            const paramName = typeof param === 'string' ? param : param?.name;
-            if (paramName) {
-              this.declareSymbol(fnScope, paramName, 'parameter', param);
-            }
-          }
-        }
-        // Bind function body
-        if (node.body) {
-          this.bindBlock(node.body, fnScope);
-        }
+        this.bindParams(node.params, fnScope);
+        if (node.body) this.bindBlock(node.body, fnScope);
         break;
       }
 
@@ -406,12 +404,7 @@ export class Binder {
 
       case 'lambda': {
         const lambdaScope = this.createScope('function', scope);
-        if (node.params) {
-          for (const param of node.params) {
-            const pName = typeof param === 'string' ? param : param?.name;
-            if (pName) this.declareSymbol(lambdaScope, pName, 'parameter');
-          }
-        }
+        this.bindParams(node.params, lambdaScope);
         this.bindNode(node.body, lambdaScope);
         break;
       }

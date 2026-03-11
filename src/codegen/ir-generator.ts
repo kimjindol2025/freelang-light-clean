@@ -115,6 +115,7 @@ export class IRGenerator {
    */
   public generateModuleIR(module: Module): Inst[] {
     const instructions: Inst[] = [];
+    this.loopStack = [];  // Reset per generation
 
     // Step 1: Import 컨텍스트 구축
     this.moduleLinkContext = {
@@ -167,14 +168,13 @@ export class IRGenerator {
     }
 
     // Step 5: 모듈 본체 IR 생성
+    let hasMain = false;
     for (const stmt of module.statements) {
+      if ((stmt as any)?.type === 'function' && (stmt as any)?.name === 'main') hasMain = true;
       this.traverse(stmt, instructions);
     }
 
     // Step 5.5: main 함수가 있으면 자동 호출
-    const hasMain = module.statements.some(
-      (s: any) => s?.type === 'function' && s?.name === 'main'
-    );
     if (hasMain) {
       instructions.push({ op: Op.CALL, arg: 'main' });
       instructions.push({ op: Op.POP });
