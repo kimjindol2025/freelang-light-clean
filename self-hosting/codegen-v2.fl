@@ -79,7 +79,7 @@ fn traverse(node, out) {
 
   // ── Literals ──
   if t == "num" {
-    push(out, inst(OP_PUSH, node.value));
+    push(out, inst(OP_PUSH, node.value * 1));
     return;
   }
   if t == "str" {
