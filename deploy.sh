@@ -17,6 +17,7 @@ NC='\033[0m' # No Color
 # 기본값
 TARGET_HOST="${1:-}"
 BUILD_TYPE="${2:-native}"  # native 또는 release
+TARGET_PORT="${3:-5020}"   # 배포 포트 (기본: 5020)
 
 # ──────────────────────────────────────────────────────────────────────────
 # 도움말
@@ -28,11 +29,16 @@ if [ -z "$TARGET_HOST" ]; then
     echo -e "${BLUE}================================${NC}"
     echo ""
     echo "사용법:"
-    echo "  ./deploy.sh <user@host> [native|release]"
+    echo "  ./deploy.sh <user@host> [build-type] [port]"
     echo ""
     echo "예시:"
     echo "  ./deploy.sh user@192.168.1.100"
-    echo "  ./deploy.sh ubuntu@api.example.com native"
+    echo "  ./deploy.sh ubuntu@api.example.com native 5020"
+    echo "  ./deploy.sh user@server.com native 8080"
+    echo ""
+    echo "기본값:"
+    echo "  build-type: native"
+    echo "  port: 5020"
     echo ""
     exit 1
 fi
@@ -249,14 +255,16 @@ echo ""
 
 echo "📊 배포 정보:"
 echo "  • 호스트: $TARGET_HOST"
+echo "  • 포트: $TARGET_PORT"
 echo "  • 경로: ~/freelang-hybrid"
 echo "  • 바이너리: bin/freelang-server"
 echo "  • 크기: $BINARY_SIZE"
 echo ""
 
 echo "🔗 접속 방법:"
-echo "  • HTTP: http://$TARGET_HOST:3000"
-echo "  • API: http://$TARGET_HOST:3000/api/health"
+echo "  • HTTP: http://$TARGET_HOST:$TARGET_PORT"
+echo "  • API: http://$TARGET_HOST:$TARGET_PORT/api/health"
+echo "  • 블로그: http://$TARGET_HOST:$TARGET_PORT/blog.html"
 echo ""
 
 echo "📝 관리 명령어:"
@@ -280,7 +288,7 @@ if command -v curl > /dev/null; then
     # 서버 호스트/IP 추출
     SERVER_ADDR=$(echo "$TARGET_HOST" | cut -d@ -f2)
 
-    if curl -s "http://$SERVER_ADDR:3000/api/health" | grep -q "healthy"; then
+    if curl -s "http://$SERVER_ADDR:$TARGET_PORT/api/health" | grep -q "healthy"; then
         echo -e "${GREEN}✅ 서버가 정상적으로 실행 중입니다!${NC}"
     else
         echo -e "${YELLOW}⚠️  서버 응답을 확인할 수 없습니다${NC}"
