@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>📝 FreeLang 블로그</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/tailwind-runtime.js" defer></script>
+</head>
+<body class="bg-gray-50 dark-bg-gray-900">
+    <div class="max-w-4xl mx-auto p-6 md-p-8 lg-p-10">
+        <!-- 헤더 -->
+        <header class="text-center mb-12">
+            <h1 class="text-4xl font-bold text-gray-900 dark-text-white mb-2">
+                📝 FreeLang 블로그
+            </h1>
+            <p class="text-xl text-gray-600 dark-text-gray-400">
+                기술과 개발 이야기
+            </p>
+        </header>
+
+        <!-- 테마 토글 버튼 -->
+        <div class="flex justify-end mb-8">
+            <button class="px-4 py-2 bg-gray-200 dark-bg-gray-700 text-gray-900 dark-text-white rounded-lg hover-bg-gray-300 dark-hover-bg-gray-600 transition"
+                    onclick="tailwindToggleDarkMode()">
+                🌓 테마 전환
+            </button>
+        </div>
+
+        <!-- 블로그 목록 -->
+        <div id="blogs" class="space-y-6">
+            <!-- 로딩 상태 -->
+            <div class="text-center py-12">
+                <p class="text-gray-500 dark-text-gray-400">
+                    📚 블로그를 불러오고 있습니다...
+                </p>
+            </div>
+        </div>
+
+        <!-- 푸터 -->
+        <footer class="text-center mt-16 pt-8 border-t border-gray-200 dark-border-gray-700">
+            <a href="/" class="text-blue-500 hover-text-blue-600 dark-hover-text-blue-400 transition">
+                ← 홈으로
+            </a>
+        </footer>
+    </div>
+
+    <script>
+        // 샘플 블로그 데이터 (실제로는 /api/blogs에서 가져옴)
+        const sampleBlogs = [
+            {
+                id: 1,
+                title: "FreeLang이란 무엇인가?",
+                author: "김준호",
+                category: "언어 설계",
+                summary: "FreeLang은 메모리 안전과 성능을 모두 고려한 현대적인 프로그래밍 언어입니다. C의 성능과 Rust의 안전성을 결합했습니다.",
+                date: "2026-03-13",
+                tags: ["FreeLang", "언어설계", "C"]
+            },
+            {
+                id: 2,
+                title: "MiniTailwind로 CSS 관리하기",
+                author: "김준호",
+                category: "웹 개발",
+                summary: "500개 이상의 유틸리티 클래스를 가진 MiniTailwind CSS 시스템을 소개합니다. 외부 의존성 없이 완전히 독립적입니다.",
+                date: "2026-03-12",
+                tags: ["CSS", "Tailwind", "웹디자인"]
+            },
+            {
+                id: 3,
+                title: "Assembler와 Linker 구현하기",
+                author: "김준호",
+                category: "시스템 프로그래밍",
+                summary: "FreeLang으로 x86-64 어셈블러와 링커를 완전히 구현했습니다. ELF 파일 생성까지 다룹니다.",
+                date: "2026-03-11",
+                tags: ["어셈블리", "컴파일러", "ELF"]
+            }
+        ];
+
+        fetch('/api/blogs')
+            .then(r => {
+                // 서버가 없으면 샘플 데이터 사용
+                if (!r.ok) throw new Error('Not found');
+                return r.json();
+            })
+            .catch(() => ({ data: { blogs: sampleBlogs } }))
+            .then(d => {
+                const blogs = d.data.blogs || sampleBlogs;
+                const blogsContainer = document.getElementById('blogs');
+
+                if (blogs.length === 0) {
+                    blogsContainer.innerHTML = `
+                        <div class="text-center py-12">
+                            <p class="text-gray-500 dark-text-gray-400">
+                                📚 아직 발행된 블로그가 없습니다.
+                            </p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                blogsContainer.innerHTML = blogs.map(b => `
+                    <article class="bg-white dark-bg-gray-800 rounded-lg p-6 border-l-4 border-blue-500
+                                   hover-shadow-lg transition cursor-pointer"
+                             onclick="alert('블로그: ${b.title.replace(/'/g, "&apos;")}')">
+                        <div class="flex justify-between items-start mb-2">
+                            <h2 class="text-2xl font-bold text-gray-900 dark-text-white
+                                      hover-text-blue-600 dark-hover-text-blue-400">
+                                ${b.title}
+                            </h2>
+                            <span class="text-sm text-gray-500 dark-text-gray-400">
+                                ${b.date}
+                            </span>
+                        </div>
+
+                        <div class="flex gap-4 text-sm text-gray-600 dark-text-gray-400 mb-4">
+                            <span class="flex items-center gap-1">
+                                👤 ${b.author}
+                            </span>
+                            <span class="flex items-center gap-1">
+                                📁 ${b.category}
+                            </span>
+                        </div>
+
+                        <p class="text-gray-700 dark-text-gray-300 leading-relaxed mb-4">
+                            ${b.summary}
+                        </p>
+
+                        <div class="flex gap-2 flex-wrap">
+                            ${b.tags.map(tag => `
+                                <span class="px-3 py-1 bg-blue-100 dark-bg-blue-900 text-blue-700 dark-text-blue-300 rounded-full text-xs font-medium">
+                                    #${tag}
+                                </span>
+                            `).join('')}
+                        </div>
+                    </article>
+                `).join('');
+            });
+    </script>
+</body>
+</html>
