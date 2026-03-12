@@ -1,0 +1,22 @@
+{
+  "counter": [
+    {
+      "id": "main",
+      "count": 5,
+      "name": "Main Counter",
+      "createdAt": "2026-03-12T12:10:21.796Z",
+      "updatedAt": "2026-03-12T12:14:19.885Z"
+    }
+  ],
+  "todos": [
+    {
+      "text": "Learn FreeLang",
+      "done": false,
+      "priority": "high",
+      "tags": [],
+      "id": 1,
+      "createdAt": "2026-03-12T12:14:19.917Z",
+      "updatedAt": "2026-03-12T12:14:19.917Z"
+    }
+  ]
+}

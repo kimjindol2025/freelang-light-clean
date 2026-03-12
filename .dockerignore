@@ -1,0 +1,67 @@
+# Docker 빌드에서 제외될 파일들
+
+# 개발 도구
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Git
+.git
+.gitignore
+.gitattributes
+.github
+
+# npm
+node_modules
+npm-debug.log
+npm-error.log
+.npmrc
+package-lock.json
+yarn.lock
+
+# 환경 설정
+.env
+.env.local
+.env.*.local
+
+# 빌드 결과
+build
+dist
+out
+.next
+.nuxt
+
+# 테스트
+coverage
+.nyc_output
+*.lcov
+
+# IDE
+.vscode
+.idea
+.DS_Store
+*.swp
+*.swo
+
+# 임시 파일
+*.tmp
+*.temp
+tmp
+
+# 문서
+*.md
+!README.md
+docs
+
+# 캐시
+.cache
+.eslintcache
+
+# CI/CD
+.github
+.gitlab-ci.yml
+.travis.yml
+appveyor.yml

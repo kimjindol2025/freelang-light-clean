@@ -1,0 +1,625 @@
+// ============================================================================
+// FreeLang Backend: REST API Specification & Implementation
+// Node.js http 모듈로 구현, FreeLang 타입으로 정의
+// ============================================================================
+
+import "../shared/types.free"
+
+// ──────────────────────────────────────────────────────────────────────────
+// 전역 상태 (백엔드)
+// ──────────────────────────────────────────────────────────────────────────
+
+global BackendState {
+  todos: array<Todo> = []
+  counter: Counter = null
+  nextTodoId: number = 1
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 데이터베이스 인터페이스
+// ──────────────────────────────────────────────────────────────────────────
+
+interface Database {
+  read() -> record
+  write(data: record) -> boolean
+  transaction(callback: func) -> boolean
+  backup() -> string
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 헬스 체크 엔드포인트
+// ──────────────────────────────────────────────────────────────────────────
+
+func healthCheck() -> ApiResponse<SystemHealth> {
+  let health: SystemHealth = {
+    status: "healthy",
+    uptime: getUptime(),
+    timestamp: now(),
+    database: {
+      todos: BackendState.todos.length,
+      counters: 1,  // main counter만 지원
+      healthy: true
+    }
+  }
+
+  return {
+    status: "success",
+    statusCode: 200,
+    data: health,
+    message: "Server is healthy"
+  }
+}
+
+func getDocs() -> ApiResponse<record> {
+  let docs = {
+    title: "FreeLang Hybrid API",
+    version: "1.0.0",
+    endpoints: [
+      {
+        method: "GET",
+        path: "/api/health",
+        description: "Health check endpoint"
+      },
+      {
+        method: "GET",
+        path: "/api/counter",
+        description: "Get current counter value"
+      },
+      {
+        method: "POST",
+        path: "/api/counter/increment",
+        description: "Increment counter"
+      },
+      {
+        method: "POST",
+        path: "/api/counter/decrement",
+        description: "Decrement counter"
+      },
+      {
+        method: "POST",
+        path: "/api/counter/reset",
+        description: "Reset counter to 0"
+      },
+      {
+        method: "POST",
+        path: "/api/counter/set",
+        description: "Set counter to specific value"
+      },
+      {
+        method: "GET",
+        path: "/api/counter/history",
+        description: "Get counter history"
+      },
+      {
+        method: "GET",
+        path: "/api/todos",
+        description: "Get all todos with optional filter"
+      },
+      {
+        method: "GET",
+        path: "/api/todos/:id",
+        description: "Get specific todo"
+      },
+      {
+        method: "POST",
+        path: "/api/todos",
+        description: "Create new todo"
+      },
+      {
+        method: "PATCH",
+        path: "/api/todos/:id",
+        description: "Update todo"
+      },
+      {
+        method: "POST",
+        path: "/api/todos/:id/toggle",
+        description: "Toggle todo done status"
+      },
+      {
+        method: "DELETE",
+        path: "/api/todos/:id",
+        description: "Delete specific todo"
+      },
+      {
+        method: "DELETE",
+        path: "/api/todos",
+        description: "Delete all todos"
+      },
+      {
+        method: "GET",
+        path: "/api/todos/stats",
+        description: "Get todo statistics"
+      }
+    ]
+  }
+
+  return {
+    status: "success",
+    statusCode: 200,
+    data: docs,
+    message: null
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Counter API 엔드포인트
+// ──────────────────────────────────────────────────────────────────────────
+
+func getCounter() -> ApiResponse<Counter> {
+  if BackendState.counter == null {
+    initializeCounter()
+  }
+
+  return {
+    status: "success",
+    statusCode: 200,
+    data: BackendState.counter,
+    message: null
+  }
+}
+
+func incrementCounter(amount: number = 1) -> ApiResponse<record> {
+  if BackendState.counter == null {
+    initializeCounter()
+  }
+
+  BackendState.counter.count += amount
+  BackendState.counter.updatedAt = now()
+
+  return {
+    status: "success",
+    statusCode: 200,
+    data: {
+      message: "Counter incremented by " + toString(amount),
+      counter: BackendState.counter
+    },
+    message: null
+  }
+}
+
+func decrementCounter(amount: number = 1) -> ApiResponse<record> {
+  if BackendState.counter == null {
+    initializeCounter()
+  }
+
+  BackendState.counter.count -= amount
+  BackendState.counter.updatedAt = now()
+
+  return {
+    status: "success",
+    statusCode: 200,
+    data: {
+      message: "Counter decremented by " + toString(amount),
+      counter: BackendState.counter
+    },
+    message: null
+  }
+}
+
+func resetCounter() -> ApiResponse<record> {
+  if BackendState.counter == null {
+    initializeCounter()
+  }
+
+  BackendState.counter.count = 0
+  BackendState.counter.updatedAt = now()
+
+  return {
+    status: "success",
+    statusCode: 200,
+    data: {
+      message: "Counter reset to 0",
+      counter: BackendState.counter
+    },
+    message: null
+  }
+}
+
+func setCounter(value: number) -> ApiResponse<record> {
+  if BackendState.counter == null {
+    initializeCounter()
+  }
+
+  if value < 0 {
+    return errorResponse("Value must be non-negative", 400)
+  }
+
+  BackendState.counter.count = value
+  BackendState.counter.updatedAt = now()
+
+  return {
+    status: "success",
+    statusCode: 200,
+    data: {
+      message: "Counter set to " + toString(value),
+      counter: BackendState.counter
+    },
+    message: null
+  }
+}
+
+func getCounterHistory() -> ApiResponse<array<record>> {
+  // 실제 구현에서는 데이터베이스에서 히스토리 조회
+  let history: array<record> = []
+
+  return {
+    status: "success",
+    statusCode: 200,
+    data: history,
+    message: null
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Todo API 엔드포인트
+// ──────────────────────────────────────────────────────────────────────────
+
+func getTodos(filter: string = "all") -> ApiResponse<record> {
+  let result: array<Todo>
+
+  if filter == "done" {
+    result = BackendState.todos.filter(t => t.done == true)
+  } else if filter == "pending" {
+    result = BackendState.todos.filter(t => t.done == false)
+  } else {
+    result = BackendState.todos
+  }
+
+  return {
+    status: "success",
+    statusCode: 200,
+    data: {
+      todos: result,
+      total: result.length,
+      filter: filter
+    },
+    message: null
+  }
+}
+
+func getTodoById(id: number) -> ApiResponse<Todo> {
+  let todo = findTodoInBackend(id)
+
+  if todo == null {
+    return errorResponse("Todo not found", 404)
+  }
+
+  return {
+    status: "success",
+    statusCode: 200,
+    data: todo,
+    message: null
+  }
+}
+
+func createTodo(text: string, priority: Priority = Priority.MEDIUM) -> ApiResponse<record> {
+  if isEmptyOrNull(text) {
+    return errorResponse("Text field is required", 400)
+  }
+
+  let newTodo: Todo = {
+    id: BackendState.nextTodoId,
+    text: text,
+    done: false,
+    priority: priority,
+    tags: [],
+    createdAt: now(),
+    updatedAt: now()
+  }
+
+  BackendState.todos.push(newTodo)
+  BackendState.nextTodoId += 1
+
+  return {
+    status: "success",
+    statusCode: 201,
+    data: {
+      message: "Todo created",
+      todo: newTodo
+    },
+    message: null
+  }
+}
+
+func updateTodo(id: number, updates: record) -> ApiResponse<record> {
+  let todo = findTodoInBackend(id)
+
+  if todo == null {
+    return errorResponse("Todo not found", 404)
+  }
+
+  if updates.text != null {
+    todo.text = updates.text
+  }
+  if updates.priority != null {
+    todo.priority = updates.priority
+  }
+  if updates.done != null {
+    todo.done = updates.done
+  }
+  if updates.tags != null {
+    todo.tags = updates.tags
+  }
+
+  todo.updatedAt = now()
+
+  return {
+    status: "success",
+    statusCode: 200,
+    data: {
+      message: "Todo updated",
+      todo: todo
+    },
+    message: null
+  }
+}
+
+func toggleTodo(id: number) -> ApiResponse<record> {
+  let todo = findTodoInBackend(id)
+
+  if todo == null {
+    return errorResponse("Todo not found", 404)
+  }
+
+  todo.done = !todo.done
+  todo.updatedAt = now()
+
+  return {
+    status: "success",
+    statusCode: 200,
+    data: {
+      message: "Todo toggled",
+      todo: todo
+    },
+    message: null
+  }
+}
+
+func deleteTodo(id: number) -> ApiResponse<record> {
+  let index = findTodoIndexInBackend(id)
+
+  if index == -1 {
+    return errorResponse("Todo not found", 404)
+  }
+
+  let deleted = BackendState.todos[index]
+  BackendState.todos.removeAt(index)
+
+  return {
+    status: "success",
+    statusCode: 200,
+    data: {
+      message: "Todo deleted",
+      todo: deleted
+    },
+    message: null
+  }
+}
+
+func deleteAllTodos() -> ApiResponse<record> {
+  let count = BackendState.todos.length
+  BackendState.todos = []
+
+  return {
+    status: "success",
+    statusCode: 200,
+    data: {
+      message: count + " todos cleared",
+      count: count
+    },
+    message: null
+  }
+}
+
+func getTodoStats() -> ApiResponse<TodoStats> {
+  let done = BackendState.todos.filter(t => t.done == true).length
+  let pending = BackendState.todos.filter(t => t.done == false).length
+
+  let byPriority = {
+    high: BackendState.todos.filter(t => t.priority == Priority.HIGH).length,
+    medium: BackendState.todos.filter(t => t.priority == Priority.MEDIUM).length,
+    low: BackendState.todos.filter(t => t.priority == Priority.LOW).length
+  }
+
+  let stats: TodoStats = {
+    total: BackendState.todos.length,
+    done: done,
+    pending: pending,
+    byPriority: byPriority,
+    byTag: {}  // Todo: 태그별 통계
+  }
+
+  return {
+    status: "success",
+    statusCode: 200,
+    data: stats,
+    message: null
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 헬퍼 함수들
+// ──────────────────────────────────────────────────────────────────────────
+
+private func findTodoInBackend(id: number) -> Todo {
+  for todo in BackendState.todos {
+    if todo.id == id {
+      return todo
+    }
+  }
+  return null
+}
+
+private func findTodoIndexInBackend(id: number) -> number {
+  for i in 0..BackendState.todos.length {
+    if BackendState.todos[i].id == id {
+      return i
+    }
+  }
+  return -1
+}
+
+private func initializeCounter() {
+  BackendState.counter = {
+    id: "main",
+    count: 0,
+    name: "Main Counter",
+    createdAt: now(),
+    updatedAt: now()
+  }
+}
+
+private func isEmptyOrNull(str: string) -> boolean {
+  return str == null || str.trim().length == 0
+}
+
+private func errorResponse(message: string, statusCode: number) -> ApiResponse<null> {
+  return {
+    status: "error",
+    statusCode: statusCode,
+    data: null,
+    message: message
+  }
+}
+
+private func now() -> timestamp {
+  return timestamp.now()
+}
+
+private func getUptime() -> number {
+  // 실제 구현에서는 서버 시작 시간에서 현재 시간까지의 차이 반환
+  return 0
+}
+
+private func toString(value: number) -> string {
+  // 숫자를 문자열로 변환
+  return value
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 초기화 및 시스템 진입점
+// ──────────────────────────────────────────────────────────────────────────
+
+func initializeBackend() {
+  BackendState.counter = null
+  BackendState.todos = []
+  BackendState.nextTodoId = 1
+
+  initializeCounter()
+}
+
+func getBackendState() -> record {
+  return {
+    todos: BackendState.todos,
+    counter: BackendState.counter,
+    nextTodoId: BackendState.nextTodoId
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// HTTP 요청 처리 (Node.js와의 바인딩)
+// 이 함수들은 JavaScript에서 호출됨
+// ──────────────────────────────────────────────────────────────────────────
+
+interface HttpHandler {
+  handle(method: string, path: string, body: record) -> ApiResponse<any>
+}
+
+func routeRequest(method: string, path: string, body: record) -> ApiResponse<any> {
+  // GET /api/health
+  if method == "GET" && path == "/api/health" {
+    return healthCheck()
+  }
+
+  // GET /api/docs
+  if method == "GET" && path == "/api/docs" {
+    return getDocs()
+  }
+
+  // Counter routes
+  if method == "GET" && path == "/api/counter" {
+    return getCounter()
+  }
+  if method == "POST" && path == "/api/counter/increment" {
+    let amount = body.amount != null ? body.amount : 1
+    return incrementCounter(amount)
+  }
+  if method == "POST" && path == "/api/counter/decrement" {
+    let amount = body.amount != null ? body.amount : 1
+    return decrementCounter(amount)
+  }
+  if method == "POST" && path == "/api/counter/reset" {
+    return resetCounter()
+  }
+  if method == "POST" && path == "/api/counter/set" {
+    if body.count == null {
+      return errorResponse("Count field is required", 400)
+    }
+    return setCounter(body.count)
+  }
+  if method == "GET" && path == "/api/counter/history" {
+    return getCounterHistory()
+  }
+
+  // Todo routes
+  if method == "GET" && path == "/api/todos" {
+    let filter = body.filter != null ? body.filter : "all"
+    return getTodos(filter)
+  }
+  if method == "POST" && path == "/api/todos" {
+    if body.text == null {
+      return errorResponse("Text field is required", 400)
+    }
+    let priority = body.priority != null ? body.priority : Priority.MEDIUM
+    return createTodo(body.text, priority)
+  }
+  if method == "DELETE" && path == "/api/todos" {
+    return deleteAllTodos()
+  }
+  if method == "GET" && path == "/api/todos/stats" {
+    return getTodoStats()
+  }
+
+  // Dynamic routes: /api/todos/:id
+  if method == "GET" && path.startsWith("/api/todos/") {
+    let id = extractIdFromPath(path, "/api/todos/")
+    if id > 0 {
+      return getTodoById(id)
+    }
+  }
+  if method == "PATCH" && path.startsWith("/api/todos/") {
+    let id = extractIdFromPath(path, "/api/todos/")
+    if id > 0 {
+      return updateTodo(id, body)
+    }
+  }
+  if method == "POST" && path.startsWith("/api/todos/") && path.contains("/toggle") {
+    let id = extractIdFromPath(path, "/api/todos/")
+    if id > 0 {
+      return toggleTodo(id)
+    }
+  }
+  if method == "DELETE" && path.startsWith("/api/todos/") {
+    let id = extractIdFromPath(path, "/api/todos/")
+    if id > 0 {
+      return deleteTodo(id)
+    }
+  }
+
+  // Not found
+  return errorResponse("Endpoint not found", 404)
+}
+
+private func extractIdFromPath(path: string, prefix: string) -> number {
+  let part = path.substring(prefix.length)
+  let idx = part.indexOf("/")
+  if idx != -1 {
+    part = part.substring(0, idx)
+  }
+  return parseInt(part)
+}
+
+private func parseInt(str: string) -> number {
+  // 문자열을 숫자로 변환
+  return str
+}
