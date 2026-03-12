@@ -9,14 +9,13 @@ use std::io::*
 use std::fs::*
 use std::net::*
 
-// HTTP 엔진 import
-// use "./http_parser"
-// use "./http_handler"
-// use "./tcp_socket"
+// HTTP 엔진 import ✅
+use "../engine/http_parser"
+use "../engine/http_handler"
 
-// Blog 모듈 import
-// use "./blog-db"
-// use "./blog-api"
+// Blog 모듈 import ✅
+use "./blog-db"
+use "./blog-api"
 
 // ============================================================================
 // PART 1: HTTP 요청 핸들러 (HTTP Engine과 Blog API 통합)
@@ -128,12 +127,18 @@ pub fn main() -> void {
     // 3. HTTP 서버 시작
     print("🌐 Starting HTTP server on port 5021...")
     print("   → http://localhost:5021")
+    print("")
 
-    // HTTP 엔진 시작
-    // http_server_main("127.0.0.1", 5021, handle_http_request)
-
-    // 임시: 간단한 메시지
-    print("✨ Server ready!")
+    // HTTP 엔진 시작 ✅ (HTTP Engine 통합)
+    match http_server_main("127.0.0.1", 5021, handle_http_request)
+      Ok(()) => {
+        print("✨ Server ready!")
+      }
+      Err(e) => {
+        print("❌ Server error: " + e)
+        return void
+      }
+    end
     print("")
     print("📌 API 엔드포인트:")
     print("   GET    /api/blogs        - 포스트 목록")
@@ -161,8 +166,8 @@ pub fn main() -> void {
 fn print(msg: string) -> void {
   intent "메시지 출력"
   do
-    // 표준 출력
-    // stdout.write(msg + "\n")
+    // 표준 출력 - FreeLang std::io 사용
+    println(msg)
     return void
   end
 }
