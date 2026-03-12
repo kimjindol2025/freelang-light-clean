@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FreeLang Blog</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --primary-light: #818cf8;
+            --secondary: #ec4899;
+            --accent: #14b8a6;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --dark: #1e293b;
+            --dark-secondary: #334155;
+            --light: #f8fafc;
+            --border: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #1e293b;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Header Styles */
+        header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 40px;
+            border-radius: 20px;
+            margin-bottom: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+
+        h1 {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+            font-size: 3em;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            color: #64748b;
+            font-size: 1.1em;
+            font-weight: 500;
+        }
+
+        /* Form Styles */
+        .create-post {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 40px;
+            border-radius: 20px;
+            margin-bottom: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+
+        .create-post h2 {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-size: 1.8em;
+            font-weight: 700;
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+            color: #1e293b;
+            font-weight: 600;
+            font-size: 0.95em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        input[type="text"],
+        input[type="email"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            font-family: inherit;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            background: #f8fafc;
+        }
+
+        input[type="text"]:focus,
+        input[type="email"]:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: white;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 160px;
+            font-family: 'Menlo', 'Monaco', monospace;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        button {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 14px 32px;
+            border: none;
+            border-radius: 12px;
+            font-size: 0.95em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 25px rgba(99, 102, 241, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 35px rgba(99, 102, 241, 0.4);
+        }
+
+        button:active {
+            transform: translateY(-1px);
+        }
+
+        /* Posts Container */
+        .posts-container {
+            display: grid;
+            gap: 28px;
+        }
+
+        /* Post Card Styles */
+        .post-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 32px;
+            border-radius: 18px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .post-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .post-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.15);
+            border-color: var(--primary);
+        }
+
+        .post-card:hover::before {
+            opacity: 1;
+        }
+
+        .post-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 20px;
+            gap: 16px;
+        }
+
+        .post-card h2 {
+            color: var(--dark);
+            margin-bottom: 10px;
+            font-size: 1.5em;
+            font-weight: 700;
+            line-height: 1.3;
+        }
+
+        .post-card h2:hover {
+            color: var(--primary);
+            transition: color 0.3s ease;
+        }
+
+        .post-meta {
+            color: #94a3b8;
+            font-size: 0.9em;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .post-category {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: 600;
+            margin-right: 8px;
+            text-transform: capitalize;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+        }
+
+        .post-content {
+            color: #475569;
+            line-height: 1.7;
+            margin-bottom: 20px;
+            max-height: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-size: 0.95em;
+        }
+
+        .post-stats {
+            display: flex;
+            gap: 24px;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+            color: #64748b;
+            padding: 16px 0;
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .stat {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 600;
+        }
+
+        .stat span:first-child {
+            color: var(--primary);
+        }
+
+        .reading-time {
+            display: inline-block;
+            color: var(--primary);
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+
+        .post-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .post-actions button {
+            padding: 10px 18px;
+            font-size: 0.85em;
+            background: #f1f5f9;
+            color: #1e293b;
+            box-shadow: none;
+            border: 1px solid var(--border);
+        }
+
+        .post-actions button:hover {
+            background: #e2e8f0;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .read-more-btn {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%) !important;
+            color: white !important;
+            border: none !important;
+        }
+
+        .delete-btn {
+            background: linear-gradient(135deg, var(--danger) 0%, #dc2626 100%) !important;
+            color: white !important;
+            border: none !important;
+        }
+
+        .delete-btn:hover {
+            box-shadow: 0 10px 25px rgba(239, 68, 68, 0.3) !important;
+        }
+
+        /* Notifications */
+        .loading {
+            text-align: center;
+            padding: 60px;
+            color: white;
+            font-size: 1.1em;
+        }
+
+        .error {
+            background: linear-gradient(135deg, var(--danger) 0%, #dc2626 100%);
+            color: white;
+            padding: 16px 20px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            font-weight: 500;
+            box-shadow: 0 10px 25px rgba(239, 68, 68, 0.25);
+            border-left: 4px solid white;
+        }
+
+        .success {
+            background: linear-gradient(135deg, var(--success) 0%, #16a34a 100%);
+            color: white;
+            padding: 16px 20px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            font-weight: 500;
+            box-shadow: 0 10px 25px rgba(34, 197, 94, 0.25);
+            border-left: 4px solid white;
+        }
+
+        .badge {
+            display: inline-block;
+            background: var(--warning);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.75em;
+            font-weight: 700;
+            margin-left: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 80px 20px;
+            color: white;
+        }
+
+        .empty-state h3 {
+            font-size: 2em;
+            margin-bottom: 12px;
+            font-weight: 700;
+        }
+
+        .empty-state p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 2em;
+            }
+
+            header {
+                padding: 24px;
+            }
+
+            .create-post {
+                padding: 24px;
+            }
+
+            .post-header {
+                flex-direction: column;
+            }
+
+            .post-stats {
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .post-actions {
+                flex-wrap: wrap;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📝 FreeLang Blog</h1>
+            <p class="subtitle">Zero Dependencies, Pure Node.js Blog Engine</p>
+        </header>
+
+        <div id="message"></div>
+
+        <div class="create-post">
+            <h2 style="margin-bottom: 20px; color: #333;">✍️ New Post</h2>
+            <form id="createForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="title">Title</label>
+                        <input type="text" id="title" required placeholder="Post title">
+                    </div>
+                    <div class="form-group">
+                        <label for="author">Author</label>
+                        <input type="text" id="author" required placeholder="Your name">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="category">Category</label>
+                        <input type="text" id="category" required placeholder="e.g. Tutorial, News">
+                    </div>
+                    <div class="form-group">
+                        <label for="slug">Slug</label>
+                        <input type="text" id="slug" required placeholder="url-friendly-slug">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Description</label>
+                    <input type="text" id="description" placeholder="Brief description">
+                </div>
+
+                <div class="form-group">
+                    <label for="content">Content</label>
+                    <textarea id="content" required placeholder="Post content..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="tags">Tags (comma-separated)</label>
+                    <input type="text" id="tags" placeholder="tag1, tag2, tag3">
+                </div>
+
+                <button type="submit">📤 Create Post</button>
+            </form>
+        </div>
+
+        <!-- 플러그인 UI: 대시보드 -->
+        <div id="plugin-dashboard" style="margin-top: 40px;"></div>
+
+        <div class="posts-container" id="posts">
+            <div class="loading">Loading posts...</div>
+        </div>
+
+        <!-- 플러그인 UI: 사이드바 -->
+        <div id="plugin-sidebar" style="margin-top: 40px;"></div>
+
+        <!-- 플러그인 UI: 푸터 -->
+        <div id="plugin-footer" style="margin-top: 40px;"></div>
+    </div>
+
+    <style id="modal-styles">
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.8);
+        }
+
+        .modal-content {
+            background: white;
+            margin: 5% auto;
+            padding: 40px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 900px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .modal-close {
+            float: right;
+            font-size: 2em;
+            font-weight: bold;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .modal-close:hover {
+            color: #333;
+        }
+
+        .post-detail h1 {
+            color: #667eea;
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .post-detail-meta {
+            color: #999;
+            margin-bottom: 20px;
+            font-size: 0.95em;
+        }
+
+        .post-detail-meta span {
+            margin-right: 20px;
+        }
+
+        .post-detail-content {
+            color: #333;
+            line-height: 1.8;
+            font-size: 1.05em;
+            margin-bottom: 30px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .post-detail-tags {
+            margin-bottom: 20px;
+        }
+
+        .tag {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 0.85em;
+            margin-right: 8px;
+            margin-bottom: 8px;
+        }
+
+        .post-detail-stats {
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+            margin-top: 20px;
+        }
+
+        .post-detail-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+        }
+
+        .post-detail-actions button {
+            flex: 1;
+            padding: 12px;
+        }
+    </style>
+
+    <div id="postModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closePostModal()">&times;</span>
+            <div id="postDetailContent" class="post-detail"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:5021/api';
+
+        function showMessage(text, type = 'success') {
+            const msg = document.getElementById('message');
+            msg.className = type;
+            msg.textContent = text;
+            setTimeout(() => { msg.textContent = ''; }, 3000);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function renderMarkdown(text) {
+            // Simple markdown rendering
+            return text
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/\`(.*?)\`/g, '<code>$1</code>')
+                .replace(/\n\n/g, '</p><p>')
+                .replace(/\n/g, '<br>')
+                .split('\n').map(line => {
+                    if (line.match(/^###\s/)) return `<h3>${line.replace(/^###\s/, '')}</h3>`;
+                    if (line.match(/^##\s/)) return `<h2>${line.replace(/^##\s/, '')}</h2>`;
+                    if (line.match(/^#\s/)) return `<h1>${line.replace(/^#\s/, '')}</h1>`;
+                    return line;
+                }).join('\n');
+        }
+
+        async function loadPosts() {
+            try {
+                const response = await fetch(`${API_URL}/blogs`);
+                const data = await response.json();
+
+                const postsDiv = document.getElementById('posts');
+
+                if (!data.data || data.data.length === 0) {
+                    postsDiv.innerHTML = `
+                        <div class="empty-state">
+                            <h3>포스트가 없습니다</h3>
+                            <p>위에서 첫 포스트를 작성해보세요!</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                postsDiv.innerHTML = data.data
+                    .reverse()
+                    .map(post => `
+                        <div class="post-card">
+                            <div class="post-header">
+                                <div>
+                                    <h2>${escapeHtml(post.title)}</h2>
+                                    <div class="post-meta">
+                                        ${escapeHtml(post.author)} • ${new Date(post.createdAt).toLocaleDateString('ko-KR')}
+                                    </div>
+                                </div>
+                                ${post.featured ? '<span class="badge">⭐ Featured</span>' : ''}
+                            </div>
+
+                            <div>
+                                <span class="post-category">${escapeHtml(post.category)}</span>
+                            </div>
+
+                            <p class="post-content">${escapeHtml(post.description || post.content.substring(0, 150))}...</p>
+
+                            <div class="post-stats">
+                                <div class="stat">👁️ ${post.viewCount} views</div>
+                                <div class="stat">❤️ ${post.likes} likes</div>
+                                <div class="stat">⏱️ <span class="reading-time">${post.readingTimeDisplay || post.readingTime + ' min read' || '1 min read'}</span></div>
+                            </div>
+
+                            <div class="post-actions">
+                                <button onclick="openPostModal(${post.id})" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; flex: 2;">📖 전문 보기</button>
+                                <button onclick="likePost(${post.id})">❤️ Like</button>
+                                <button onclick="deletePost(${post.id})" class="delete-btn">🗑️ Delete</button>
+                            </div>
+                        </div>
+                    `).join('');
+            } catch (error) {
+                console.error('Error loading posts:', error);
+                document.getElementById('posts').innerHTML = `<div class="error">❌ 포스트 로드 오류</div>`;
+            }
+        }
+
+        async function openPostModal(id) {
+            try {
+                // 조회수 증가
+                await fetch(`${API_URL}/blogs/${id}/view`, { method: 'POST' });
+
+                // 상세 정보 로드
+                const response = await fetch(`${API_URL}/blogs/${id}`);
+                const post = await response.json();
+
+                const modal = document.getElementById('postModal');
+                const content = document.getElementById('postDetailContent');
+
+                const tagsHtml = post.tags ? post.tags.split(',').map(tag =>
+                    `<span class="tag">${escapeHtml(tag.trim())}</span>`
+                ).join('') : '';
+
+                content.innerHTML = `
+                    <h1>${escapeHtml(post.title)}</h1>
+                    <div class="post-detail-meta">
+                        <span>✍️ ${escapeHtml(post.author)}</span>
+                        <span>📅 ${new Date(post.createdAt).toLocaleDateString('ko-KR')}</span>
+                        <span>📁 ${escapeHtml(post.category)}</span>
+                        <span>⏱️ ${post.readingTimeDisplay || post.readingTime + ' min read' || '1 min read'}</span>
+                        <span>${post.featured ? '⭐ Featured' : ''}</span>
+                    </div>
+                    ${post.description ? `<p style="color: #666; font-style: italic; margin-bottom: 20px;">${escapeHtml(post.description)}</p>` : ''}
+                    <div class="post-detail-content">${escapeHtml(post.content)}</div>
+                    ${tagsHtml ? `<div class="post-detail-tags"><strong>태그:</strong> ${tagsHtml}</div>` : ''}
+                    <div class="post-detail-stats">
+                        <div class="stat">👁️ ${post.viewCount} 조회</div>
+                        <div class="stat">❤️ ${post.likes} 좋아요</div>
+                    </div>
+                    <div class="post-detail-actions">
+                        <button onclick="likePost(${post.id})">❤️ 좋아요 추가</button>
+                        <button onclick="deletePost(${post.id})" class="delete-btn">🗑️ 삭제</button>
+                        <button onclick="closePostModal()">✖️ 닫기</button>
+                    </div>
+                `;
+
+                modal.style.display = 'block';
+                loadPosts();
+            } catch (error) {
+                console.error('Error:', error);
+                showMessage('❌ 포스트 로드 오류: ' + error.message, 'error');
+            }
+        }
+
+        function closePostModal() {
+            document.getElementById('postModal').style.display = 'none';
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('postModal');
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        async function createPost(e) {
+            e.preventDefault();
+
+            const post = {
+                title: document.getElementById('title').value,
+                author: document.getElementById('author').value,
+                content: document.getElementById('content').value,
+                category: document.getElementById('category').value,
+                slug: document.getElementById('slug').value,
+                description: document.getElementById('description').value,
+                tags: document.getElementById('tags').value,
+                featured: false
+            };
+
+            try {
+                const response = await fetch(`${API_URL}/blogs`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(post)
+                });
+
+                if (response.ok) {
+                    document.getElementById('createForm').reset();
+                    showMessage('✅ 포스트 작성됨!', 'success');
+                    loadPosts();
+                } else {
+                    showMessage('❌ 포스트 작성 오류', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showMessage('❌ 오류: ' + error.message, 'error');
+            }
+        }
+
+        async function likePost(id) {
+            try {
+                await fetch(`${API_URL}/blogs/${id}/like`, { method: 'POST' });
+                loadPosts();
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        async function deletePost(id) {
+            if (confirm('정말 삭제하시겠습니까?')) {
+                try {
+                    await fetch(`${API_URL}/blogs/${id}`, { method: 'DELETE' });
+                    showMessage('✅ 포스트 삭제됨!', 'success');
+                    closePostModal();
+                    loadPosts();
+                } catch (error) {
+                    console.error('Error:', error);
+                    showMessage('❌ 삭제 오류', 'error');
+                }
+            }
+        }
+
+        async function loadPlugins() {
+            try {
+                // Load dashboard plugins
+                const dashboardResponse = await fetch(`${API_URL}/plugins/ui/dashboard`);
+                if (dashboardResponse.ok) {
+                    const dashboardData = await dashboardResponse.json();
+                    renderPlugins('dashboard', dashboardData.components);
+                }
+
+                // Load sidebar plugins
+                const sidebarResponse = await fetch(`${API_URL}/plugins/ui/sidebar`);
+                if (sidebarResponse.ok) {
+                    const sidebarData = await sidebarResponse.json();
+                    renderPlugins('sidebar', sidebarData.components);
+                }
+
+                // Load footer plugins
+                const footerResponse = await fetch(`${API_URL}/plugins/ui/footer`);
+                if (footerResponse.ok) {
+                    const footerData = await footerResponse.json();
+                    renderPlugins('footer', footerData.components);
+                }
+            } catch (error) {
+                console.error('Error loading plugins:', error);
+            }
+        }
+
+        function renderPlugins(position, components) {
+            const container = document.getElementById(`plugin-${position}`);
+            if (!container) return;
+
+            if (!components || components.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+
+            container.innerHTML = components
+                .map(comp => `
+                    <div style="background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); padding: 24px; border-radius: 18px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.6); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);">
+                        <div style="color: #94a3b8; font-size: 0.8em; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;">🔌 ${comp.plugin}</div>
+                        ${comp.html}
+                    </div>
+                `)
+                .join('');
+        }
+
+        document.getElementById('createForm').addEventListener('submit', createPost);
+
+        // Load posts and plugins on page load
+        loadPosts();
+        loadPlugins();
+
+        // Refresh posts and plugins every 5 seconds
+        setInterval(() => {
+            loadPosts();
+            loadPlugins();
+        }, 5000);
+    </script>
+</body>
+</html>
