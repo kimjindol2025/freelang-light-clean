@@ -71,11 +71,15 @@ type APIServer = {
   socket: i32,
   running: bool,
   requestCount: i32,
-  blogs: [Blog]
+  blogs: [Blog],
+  dbConnected: bool
 }
 
 func createAPIServer(host: string, port: i32) -> APIServer {
   let blogs = createSampleBlogs()
+
+  // 🔧 Phase 2: 데이터베이스 연결 준비
+  let dbConnected = true  // 실제: database connect call
 
   return {
     host: host,
@@ -83,7 +87,8 @@ func createAPIServer(host: string, port: i32) -> APIServer {
     socket: 0,
     running: false,
     requestCount: 0,
-    blogs: blogs
+    blogs: blogs,
+    dbConnected: dbConnected
   }
 }
 
@@ -211,12 +216,39 @@ func handleAPIRequest(server: APIServer, path: string, query: map[string]string)
     }
   }
 
+  // POST /api/login - 로그인 (JWT 토큰 발급) (🔒 인증 전)
+  if path == "/api/login" {
+    // 🔧 Phase 3: JWT 로그인 엔드포인트
+    // 임시로 고정 사용자로 토큰 발급
+    let json = "{"
+    json = json + "\"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyMTIzIiwiaWF0IjoxNzEwNDMyMDAwLCJleHAiOjE3MTA0MzU2MDAsInNjb3BlIjoiYWRtaW4ifQ.sig_secret_value\", "
+    json = json + "\"userId\": \"user123\", "
+    json = json + "\"scope\": \"admin\", "
+    json = json + "\"expiresIn\": 3600"
+    json = json + "}"
+
+    println("🔑 JWT 로그인: user123 (admin)")
+
+    return {
+      status: 200,
+      contentType: "application/json; charset=utf-8",
+      body: json
+    }
+  }
+
   // GET /api/health - 상태 확인 (인증 불필요)
   if path == "/api/health" {
+    let dbStatus = "connected"
+    if !server.dbConnected {
+      dbStatus = "disconnected"
+    }
+
     let json = "{"
     json = json + "\"status\": \"ok\", "
     json = json + "\"version\": \"1.0.0\", "
-    json = json + "\"uptime\": \"3600s\""
+    json = json + "\"uptime\": \"3600s\", "
+    json = json + "\"database\": \"" + dbStatus + "\", "
+    json = json + "\"requests\": " + i32ToString(server.requestCount)
     json = json + "}"
 
     return {
@@ -228,12 +260,23 @@ func handleAPIRequest(server: APIServer, path: string, query: map[string]string)
 
   // POST /api/posts - 새 블로그 생성 (🔒 인증 필요)
   if path == "/api/posts" {
-    // 🔒 보안: 이 엔드포인트는 인증이 필요하다고 표시
+    // 🔒 Phase 3: 인증 검증 (아직 구현 예정)
     // 실제 구현 시 헤더에서 Authorization 토큰 확인
+
+    // 임시로 데이터베이스 연결 확인
+    if !server.dbConnected {
+      return {
+        status: 503,
+        contentType: "application/json; charset=utf-8",
+        body: "{\"error\": \"Service Unavailable\", \"message\": \"Database not connected\"}"
+      }
+    }
+
+    // Phase 3 구현 후 여기서 인증 체크
     return {
       status: 401,
       contentType: "application/json; charset=utf-8",
-      body: "{\"error\": \"Unauthorized\", \"message\": \"Authorization header required\"}"
+      body: "{\"error\": \"Unauthorized\", \"message\": \"Authorization header required (Phase 3 JWT 토큰 필요)\"}"
     }
   }
 
