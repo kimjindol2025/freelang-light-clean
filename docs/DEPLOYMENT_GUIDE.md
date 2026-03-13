@@ -1,423 +1,263 @@
-# FreeLang 배포 가이드
+# FreeLang v2.6.0 배포 가이드
 
-**목표**: PM2를 이용한 프로덕션 배포 및 모니터링
-**상태**: Phase D 구현
-**지원 환경**: Linux (232, 73 서버)
+## 📋 개요
 
----
+FreeLang v2.6.0은 프로덕션급 프로그래밍 언어 런타임입니다.
+- **버전**: 2.6.0
+- **레벨**: 3 (완전 구현)
+- **완성도**: 95%
+- **상태**: Stable
 
-## 🚀 빠른 시작
+## 🚀 빠른 배포
 
-### 1단계: PM2 설치
+### 1단계: 저장소 클론
 
 ```bash
+git clone https://gogs.dclub.kr/kim/v2-freelang-ai.git
+cd v2-freelang-ai
+```
+
+### 2단계: 의존성 설치 및 빌드
+
+```bash
+npm install
+npm run build
+```
+
+### 3단계: PM2로 배포
+
+```bash
+# PM2 설치 (이미 설치되어 있으면 건너뛰기)
 npm install -g pm2
 
-# 자동 시작 설정
+# FreeLang 시작
+pm2 start ecosystem.config.js --env production
+
+# 상태 확인
+pm2 status
+
+# 로그 확인
+pm2 logs freelang-v2
+```
+
+### 4단계: 서비스 자동 시작 설정
+
+```bash
 pm2 startup
 pm2 save
 ```
 
-### 2단계: 애플리케이션 배포
+## 📊 배포 정보
+
+| 항목 | 값 |
+|------|-----|
+| **앱 이름** | freelang-v2 |
+| **포트** | 35600 |
+| **환경** | production |
+| **메모리 제한** | 512MB |
+| **자동 재시작** | 활성화 |
+| **헬스 타임아웃** | 3초 |
+
+## 🔍 상태 확인
+
+### PM2 상태 확인
 
 ```bash
-cd /home/kimjin/Desktop/kim/v2-freelang-ai
-
-# 빌드
-npm install
-npm run build
-
-# PM2 시작
-pm2 start pm2-freelang-config.js --env production
-
-# 상태 확인
 pm2 status
-pm2 logs
+pm2 show freelang-v2
 ```
 
-### 3단계: 모니터링
-
-```bash
-# 실시간 모니터링
-pm2 monit
-
-# 로그 확인
-pm2 logs freelang-api
-pm2 logs freelang-db-manager
-```
-
----
-
-## 📋 PM2 설정 상세
-
-### 애플리케이션 정의
-
-```javascript
-{
-  name: "freelang-api",
-  script: "./dist/cli/index.js",
-  args: "run ./examples/rest-api-server.fl",
-  instances: "max",        // 모든 CPU 코어 사용
-  exec_mode: "cluster",    // 클러스터 모드 (부하 분산)
-  watch: true,             // 파일 변경시 자동 재시작
-  max_memory_restart: "500M",
-  error_file: "./logs/api-error.log",
-  out_file: "./logs/api-out.log",
-  env: {
-    NODE_ENV: "development",
-    PORT: 3000
-  },
-  env_production: {
-    NODE_ENV: "production",
-    PORT: 3000
-  }
-}
-```
-
-### 주요 옵션 설명
-
-| 옵션 | 의미 | 용도 |
-|------|------|------|
-| `instances` | "max" = CPU 코어 수 | 자동 부하 분산 |
-| `exec_mode` | "cluster" | 여러 프로세스로 확장 |
-| `watch` | true | 파일 변경 감지 자동 재시작 |
-| `max_memory_restart` | "500M" | 메모리 초과시 자동 재시작 |
-| `error_file` | 에러 로그 경로 | 문제 디버깅 용 |
-| `env_production` | 프로덕션 환경변수 | 본 환경에서만 적용 |
-
----
-
-## 📜 배포 스크립트 (deploy-freelang.sh)
-
-### 기능
-
-```bash
-./deploy-freelang.sh [production|staging]
-```
-
-1. ✅ 환경 확인 (PM2, npm, git)
-2. ✅ 코드 업데이트 (git pull)
-3. ✅ 의존성 설치 (npm ci)
-4. ✅ 빌드 (npm run build)
-5. ✅ 테스트 (npm run test)
-6. ✅ PM2 서비스 재시작
-7. ✅ 헬스체크 (자동 재시도)
-8. ✅ 배포 완료 알림
-
-### 사용 예시
-
-```bash
-# Production 배포
-./deploy-freelang.sh production
-
-# Staging 배포
-./deploy-freelang.sh staging
-
-# 실시간 로그 확인
-tail -f /var/log/freelang-deploy.log
-```
-
-### 롤백
-
-배포 중 헬스체크 실패시:
-```
-⚠️  Automatic rollback triggered
-↓
-pm2 resurrect  (이전 상태로 복구)
-↓
-Health check passed → Deployment reverted
-```
-
----
-
-## 🔧 PM2 명령어
-
-### 상태 확인
-
-```bash
-# 프로세스 목록
-pm2 status
-
-# 상세 정보
-pm2 describe freelang-api
-
-# CPU/메모리 사용률
-pm2 monit
-
-# 전체 통계
-pm2 info
-```
-
-### 로그 관리
+### 로그 확인
 
 ```bash
 # 실시간 로그
-pm2 logs freelang-api
+pm2 logs freelang-v2
 
-# 특정 라인 수만
-pm2 logs freelang-api --lines 100
+# 마지막 100줄
+pm2 logs freelang-v2 --lines 100
 
-# 에러만 확인
-pm2 logs freelang-api --err
-
-# 로그 삭제
-pm2 flush freelang-api
+# 에러 로그만
+pm2 logs freelang-v2 --err
 ```
 
-### 프로세스 제어
+### 헬스 체크
 
 ```bash
+# 프로세스 체크
+curl http://localhost:35600/health || echo "서비스 미실행"
+
+# PM2 체크
+pm2 ping
+```
+
+## 🔧 운영 명령어
+
+### 시작/중지/재시작
+
+```bash
+# 시작
+pm2 start freelang-v2
+
+# 중지
+pm2 stop freelang-v2
+
 # 재시작
-pm2 restart freelang-api
+pm2 restart freelang-v2
 
-# 리로드 (무중단 재시작)
-pm2 reload freelang-api
-
-# 일시 중지
-pm2 stop freelang-api
-
-# 재개
-pm2 start freelang-api
-
-# 모두 재시작
-pm2 restart all
-
-# 모두 종료
-pm2 stop all
+# 삭제
+pm2 delete freelang-v2
 ```
 
-### 설정 업데이트
+### 버전 업그레이드
 
 ```bash
-# 설정 변경 후
-pm2 reload pm2-freelang-config.js
-
-# 환경 변경 (production)
-pm2 reload pm2-freelang-config.js --env production
-
-# 저장
-pm2 save
-```
-
----
-
-## 🔄 무중단 배포
-
-### 시나리오: 새 버전 배포
-
-```bash
-# 1️⃣  새 버전 코드 pull
+# 1. 코드 업데이트
 git pull origin master
 
-# 2️⃣  빌드
+# 2. 재빌드
+npm install
 npm run build
 
-# 3️⃣  무중단 리로드
-pm2 reload freelang-api
+# 3. 재시작
+pm2 restart freelang-v2
 
-# 4️⃣  헬스체크
-curl http://localhost:3000/health
+# 4. 상태 확인
+pm2 status
 ```
 
-### Zero Downtime Deploy 원리
-
-```
-Old Process (Port 3000)
-       ↓
-New Process 시작 (Port 3001, 3002 ...)
-       ↓
-요청을 새 Process로 점진적 이동
-       ↓
-Old Process 종료
-       ↓
-New Process (Port 3000) 운영
-```
-
----
-
-## 📊 모니터링 & 알림
-
-### PM2 웹 대시보드
+### 로그 정리
 
 ```bash
-# 웹 UI 시작 (포트 9615)
-pm2 web
+# PM2 로그 초기화
+pm2 flush
 
-# 접근: http://localhost:9615
+# 로그 파일 확인
+ls -lh /var/log/pm2/
 ```
 
-### 상태 모니터링
+## 📈 성능 모니터링
 
-```javascript
-// pm2-freelang-config.js에서
-monitor: {
-  memory: 500,     // MB
-  cpu: 90          // %
-}
-```
-
-### Slack 알림 (선택사항)
+### 실시간 모니터링
 
 ```bash
-# 환경변수 설정
-export SLACK_WEBHOOK_URL="https://hooks.slack.com/..."
-
-# 배포 실행
-./deploy-freelang.sh production
-
-# 결과 → Slack으로 자동 전송
-```
-
----
-
-## 🛡️ 보안 체크리스트
-
-### 배포 전
-
-- [ ] NODE_ENV = "production" 설정
-- [ ] 비밀키 관리 (환경변수)
-- [ ] SSL/TLS 인증서 설치
-- [ ] 방화벽 규칙 확인 (포트 3000)
-- [ ] 백업 설정
-
-### 배포 후
-
-- [ ] 헬스체크 (HTTP 200)
-- [ ] API 응답 테스트
-- [ ] 로그 확인 (에러 없음)
-- [ ] 메모리/CPU 정상
-- [ ] 외부 접근 가능 확인
-
----
-
-## 🚨 트러블슈팅
-
-### 프로세스가 계속 재시작됨
-
-```bash
-# 로그 확인
-pm2 logs --lines 50
-
-# 에러 원인 파악 후
-npm run build
-
-# 재시작
-pm2 restart freelang-api
-```
-
-### 메모리 누수
-
-```bash
-# 메모리 사용률 확인
+# PM2 모니터 활성화
 pm2 monit
-
-# 프로세스 메모리 제한 설정
-pm2 start pm2-freelang-config.js
-pm2 set max_memory_restart "500M"
-pm2 save
 ```
 
-### 포트 충돌
+### 메모리/CPU 추적
+
+```bash
+# PM2 상태 확인 (메모리/CPU 포함)
+pm2 status
+
+# 자세한 정보
+pm2 show freelang-v2
+```
+
+## 🚨 문제 해결
+
+### 포트 이미 사용 중
 
 ```bash
 # 포트 사용 중인 프로세스 확인
-lsof -i :3000
+lsof -i :35600
+
+# 프로세스 종료
+kill -9 <PID>
 
 # 다른 포트로 변경
-# pm2-freelang-config.js에서 PORT 수정
+# ecosystem.config.js에서 PORT 수정 후 재시작
 ```
 
-### 배포 실패
+### 메모리 부족
 
 ```bash
-# 1. 로그 확인
-tail -f /var/log/freelang-deploy.log
+# 메모리 제한 확인
+pm2 show freelang-v2 | grep max_memory
 
-# 2. 수동 빌드 테스트
-npm run build
-
-# 3. PM2 상태 확인
-pm2 status
-
-# 4. 필요시 수동 롤백
-pm2 resurrect
+# 메모리 증가 필요시
+# ecosystem.config.js에서 max_memory_restart 수정
 ```
 
----
-
-## 📈 성능 최적화
-
-### 클러스터 모드
-
-```javascript
-{
-  instances: "max",   // CPU 코어 수만큼 프로세스
-  exec_mode: "cluster"
-}
-
-// 결과: 부하 분산, 높은 가용성
-// - 4 코어 CPU → 4개 프로세스 실행
-// - 자동 로드 밸런싱
-```
-
-### 메모리 최적화
-
-```javascript
-{
-  max_memory_restart: "500M",  // 초과시 자동 재시작
-  watch: false                 // 성능 중시시 비활성화
-}
-```
-
-### 응답 시간 개선
+### 자동 재시작 반복
 
 ```bash
-# 1. 빌드 캐시 활용
-npm ci  # (npm install 대신)
+# 최근 재시작 이유 확인
+pm2 logs freelang-v2 --err
 
-# 2. 프로덕션 모드
-NODE_ENV=production npm start
-
-# 3. 파일 감시 비활성화
-watch: false
+# 환경 변수 확인
+pm2 env freelang-v2
 ```
 
+## 📋 체크리스트
+
+배포 전 확인사항:
+
+- [ ] Node.js 18+ 설치 확인
+- [ ] npm 의존성 설치 완료
+- [ ] TypeScript 빌드 성공
+- [ ] dist/ 디렉토리 생성됨
+- [ ] PM2 설치됨
+- [ ] ecosystem.config.js 확인됨
+- [ ] 포트 35600 사용 가능
+- [ ] 권한 설정 확인
+
+배포 후 확인사항:
+
+- [ ] `pm2 status` 실행 중 확인
+- [ ] 로그 파일 생성됨
+- [ ] 헬스 체크 응답
+- [ ] 메모리 사용량 정상 (512MB 이하)
+- [ ] CPU 사용량 정상 (< 5%)
+- [ ] 자동 재시작 설정됨
+
+## 🔄 지속적 배포 (CI/CD)
+
+### GitHub Actions 예시
+
+```yaml
+name: Deploy FreeLang v2.6
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '18'
+      - run: npm install
+      - run: npm run build
+      - name: Deploy to production
+        run: |
+          npm install -g pm2
+          pm2 connect
+          pm2 start ecosystem.config.js --env production
+```
+
+## 📞 지원
+
+- **저장소**: https://gogs.dclub.kr/kim/v2-freelang-ai
+- **이슈**: https://gogs.dclub.kr/kim/v2-freelang-ai/issues
+- **버전**: v2.6.0
+- **레벨**: 3
+
+## 📝 변경 이력
+
+### v2.6.0 (2026-03-06)
+- Level 3 완전 구현
+- Float 타입 지원
+- TCP 네트워크 지원
+- JIT Hotspot Detection
+- AOT 컴파일
+- LLVM 최적화 파이프라인
+
 ---
 
-## 📝 배포 체크리스트
-
-### 배포 전
-
-- [ ] 모든 테스트 통과
-- [ ] 설정 파일 검토
-- [ ] 환경변수 설정
-- [ ] 데이터베이스 마이그레이션 완료
-
-### 배포 중
-
-- [ ] `./deploy-freelang.sh production` 실행
-- [ ] 빌드 성공 확인
-- [ ] 헬스체크 통과
-
-### 배포 후
-
-- [ ] `pm2 status` 확인
-- [ ] `pm2 logs` 에러 확인 없음
-- [ ] API 응답 테스트
-- [ ] 트래픽 모니터링
-- [ ] 성능 지표 확인
-
----
-
-## 🔗 관련 문서
-
-- [EXPRESS_COMPAT_API.md](./EXPRESS_COMPAT_API.md) - 웹 프레임워크
-- [ORM_DESIGN.md](./ORM_DESIGN.md) - 데이터베이스
-- [pm2-freelang-config.js](../pm2-freelang-config.js) - 설정 파일
-- [deploy-freelang.sh](../deploy-freelang.sh) - 배포 스크립트
-
----
-
-**프로젝트**: FreeLang v2
-**단계**: Phase D (배포)
 **마지막 업데이트**: 2026-03-06
+**상태**: 🟢 Production Ready

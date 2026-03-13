@@ -1,80 +1,81 @@
-# Build
+# Build & Dependencies
+node_modules/
 dist/
 build/
 *.o
 *.a
+.npm/
+.npm-global/
 
-# Dependencies
-node_modules/
-npm-debug.log
-yarn-error.log
+# Test Files (루트의 test-*.* 파일들)
+test-*.js
+test-*.ts
+test-*.free
+test-*.fl
+test-*.v5
+test_*.ts
+test_*.free
+test.free
+test1.db
+test2.db
+test_fixed.db
+test_simple.db
+test_v2.db
+test.db
+*.db
 
-# IDE
+# Logs & Reports
+logs/
+*.log
+.npm/_logs/
+EVOLUTION_LOG.json
+REAL_EVOLUTION_REPORT.json
+SESSION_FINAL_SUMMARY.txt
+SELF_EVOLUTION_REPORT.json
+SECURITY_PATCH_REPORT.txt
+
+# IDE & Editor
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 .DS_Store
+Thumbs.db
 
-# Test
-coverage/
-*.lcov
-
-# Generated
-*.c
-*.h
-
-# But keep stdlib source files (Phase 26+)
-!stdlib/ffi/*.c
-!stdlib/ffi/*.h
-!stdlib/core/*.c
-!stdlib/core/*.h
+# Environment & Credentials
+.env
+.env.local
+.env.*.local
+.git-credentials
+.ssh/
+.claude/.credentials.json
 
 # Temporary
 .tmp/
 temp/
 *.temp
+.backups/
+.patch_backups/
+.freelang-ai-out/
 
-# Environment
-.env
-.env.local
-*.bundle
+# Coverage
+coverage/
+*.lcov
 
-# System & User Files
-.bash_history
-.bashrc
-.zshrc
-.profile
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
 
-# Credentials & Security
-.git-credentials
-.ssh/
-.claude/.credentials.json
+# Generated Files (but keep some)
+*.c
+!stdlib/ffi/*.c
+!stdlib/core/*.c
+!stdlib/**/*.c
 
-# npm Cache
-.npm/
-.npm-global/
-.npmrc
-
-# Claude Code Files
-.claude/
-!.claude/CLAUDE.md
-!.claude/agents/
-!.claude/rules/
-
-# Backup Files
-backups/
-*.backup
-*.bak
-
-# Logs
-logs/
-*.log
-.npm/_logs/
-
-# OS Files
-.DS_Store
-Thumbs.db
-*.swp
-*~
+*.h
+!stdlib/ffi/*.h
+!stdlib/core/*.h
+!stdlib/**/*.h
