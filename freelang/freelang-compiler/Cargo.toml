@@ -1,0 +1,16 @@
+[package]
+name = "freelang-compiler"
+version = "0.1.0"
+edition = "2021"
+authors = ["Kim <kim@dclub.kr>"]
+description = "FreeLang Compiler & VM - Execute Challenge 14 Code"
+
+[dependencies]
+
+[[bin]]
+name = "freelang"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = 3
+lto = true
