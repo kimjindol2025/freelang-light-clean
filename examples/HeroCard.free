@@ -1,0 +1,140 @@
+/**
+ * HeroCard Component - Phase 8-9 Design Features Demo
+ *
+ * Demonstrates all new design directives:
+ * - @animation: CSS keyframe animations
+ * - @glass: Glassmorphism effects
+ * - @3d: 3D transformations
+ * - @micro: Micro-interactions
+ * - @scroll: Scroll-triggered animations
+ */
+
+component HeroCard {
+  props {
+    title: string
+    subtitle: string
+    imageUrl: string
+    buttonLabel: string
+  }
+
+  // Animation: Fade in on load
+  @animation cardEnter {
+    duration: 600
+    opacity: 0 → 1
+    transform: translateY(20px) → translateY(0px)
+  }
+
+  // Animation: Title text reveal
+  @animation titleReveal {
+    duration: 800
+    delay: 200
+    opacity: 0 → 1
+    transform: translateX(-30px) → translateX(0px)
+  }
+
+  // Animation: Subtle bounce on hover
+  @animation hoverBounce {
+    duration: 400
+    transform: scale(1) → scale(1.05) → scale(1)
+  }
+
+  // Glassmorphism: Modern card effect
+  @glass {
+    background: rgba(255, 255, 255, 0.08)
+    backdropFilter: blur(12px)
+    border: 1px solid rgba(255, 255, 255, 0.15)
+    borderRadius: 16px
+    boxShadow: 0 8px 32px rgba(31, 38, 135, 0.2)
+  }
+
+  // 3D Transform: Subtle 3D perspective
+  @3d {
+    perspective: 1200px
+    rotateX: 2deg
+    rotateY: -5deg
+  }
+
+  // Micro-interaction: Button pulse effect on hover
+  @micro {
+    selector: .cta-button
+    event: hover
+    action: pulse
+    duration: 500
+  }
+
+  // Scroll Trigger: Reveal animation when scrolling into view
+  @scroll {
+    selector: .content
+    animation: cardEnter
+    offset: -100px
+    once: true
+  }
+
+  style {
+    .hero-card {
+      width: 100%;
+      maxWidth: 400px;
+      animation: cardEnter 0.6s ease-out forwards;
+    }
+
+    .card-image {
+      width: 100%;
+      height: 240px;
+      objectFit: cover;
+      borderRadius: 12px 12px 0 0;
+    }
+
+    .card-body {
+      padding: 24px;
+    }
+
+    .card-title {
+      fontSize: 24px;
+      fontWeight: 700;
+      marginBottom: 8px;
+      animation: titleReveal 0.8s ease-out 0.2s forwards;
+    }
+
+    .card-subtitle {
+      fontSize: 14px;
+      opacity: 0.7;
+      marginBottom: 16px;
+    }
+
+    .cta-button {
+      padding: 12px 24px;
+      backgroundColor: rgba(0, 127, 255, 0.8);
+      color: white;
+      border: none;
+      borderRadius: 8px;
+      cursor: pointer;
+      fontSize: 16px;
+      fontWeight: 600;
+      transition: all 0.3s ease;
+    }
+
+    .cta-button:hover {
+      backgroundColor: rgba(0, 127, 255, 1);
+      transform: scale(1.05);
+    }
+  }
+
+  markup {
+    <div class="hero-card glass-0 transform-3d-3d-0">
+      <img class="card-image" src={imageUrl} alt={title} />
+
+      <div class="card-body">
+        <h2 class="card-title">{title}</h2>
+        <p class="card-subtitle">{subtitle}</p>
+
+        <button class="cta-button">
+          {buttonLabel}
+        </button>
+      </div>
+
+      <div class="content">
+        {/* Content that triggers scroll animation */}
+      </div>
+    </div>
+  }
+}
