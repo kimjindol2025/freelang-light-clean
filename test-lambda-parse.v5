@@ -1,6 +1,0 @@
-fn main() {
-  let f = fn(x) -> x * 2;
-  println(f);
-}
-
-main();

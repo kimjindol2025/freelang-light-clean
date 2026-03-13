@@ -1,6 +1,0 @@
-// Test try-catch syntax
-try {
-  println("in try block");
-} catch (e) {
-  println("in catch block");
-}
