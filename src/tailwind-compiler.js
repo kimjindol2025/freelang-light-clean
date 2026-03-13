@@ -378,7 +378,7 @@ body {
 
   /**
    * Purge 패턴 추가 (사용되지 않는 클래스 제거)
-   * @param {string[]} patterns - 파일 패턴 (예: "src/**/*.html")
+   * @param {string[]} patterns - 파일 패턴
    */
   addPurgePatterns(patterns) {
     this.purgePatterns.push(...patterns);
