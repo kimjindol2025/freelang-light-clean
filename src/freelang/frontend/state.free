@@ -1,0 +1,406 @@
+// ============================================================================
+// FreeLang Frontend: State Management
+// React와의 하이브리드: FreeLang이 상태/로직 담당, React가 렌더링 담당
+// ============================================================================
+
+import "../shared/types.free"
+
+// ──────────────────────────────────────────────────────────────────────────
+// 전역 상태 정의 (Redux/Vuex 대체)
+// ──────────────────────────────────────────────────────────────────────────
+
+global AppState {
+  // UI 상태
+  isLoading: boolean = false
+  error: string = null
+
+  // 도메인 데이터
+  todos: array<Todo> = []
+  counter: Counter = null
+
+  // UI 전용
+  selectedTodoId: number = null
+  filterType: string = "all"        // "all", "done", "pending"
+  searchQuery: string = ""
+
+  // 히스토리 (시간 여행 디버깅)
+  history: array<record> = []
+  historyIndex: number = -1
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 액션: 메타데이터 추적
+// ──────────────────────────────────────────────────────────────────────────
+
+global ActionHistory {
+  actions: array<Action> = []
+  maxSize: number = 50
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Counter 액션들
+// ──────────────────────────────────────────────────────────────────────────
+
+func incrementCounter(amount: number = 1) -> Counter {
+  if AppState.counter == null {
+    AppState.counter = {
+      id: "main",
+      count: 0,
+      name: "Main Counter",
+      createdAt: now(),
+      updatedAt: now()
+    }
+  }
+
+  AppState.counter.count += amount
+  AppState.counter.updatedAt = now()
+
+  recordAction({
+    type: ActionType.INCREMENT_COUNTER,
+    payload: { amount },
+    timestamp: now()
+  })
+
+  return AppState.counter
+}
+
+func decrementCounter(amount: number = 1) -> Counter {
+  if AppState.counter == null {
+    return null
+  }
+
+  AppState.counter.count -= amount
+  AppState.counter.updatedAt = now()
+
+  recordAction({
+    type: ActionType.DECREMENT_COUNTER,
+    payload: { amount },
+    timestamp: now()
+  })
+
+  return AppState.counter
+}
+
+func resetCounter() -> Counter {
+  if AppState.counter == null {
+    return null
+  }
+
+  AppState.counter.count = 0
+  AppState.counter.updatedAt = now()
+
+  recordAction({
+    type: ActionType.RESET_COUNTER,
+    payload: {},
+    timestamp: now()
+  })
+
+  return AppState.counter
+}
+
+func setCounter(value: number) -> Counter {
+  if AppState.counter == null {
+    AppState.counter = {
+      id: "main",
+      count: 0,
+      name: "Main Counter",
+      createdAt: now(),
+      updatedAt: now()
+    }
+  }
+
+  AppState.counter.count = value
+  AppState.counter.updatedAt = now()
+
+  recordAction({
+    type: ActionType.SET_COUNTER,
+    payload: { value },
+    timestamp: now()
+  })
+
+  return AppState.counter
+}
+
+func getCounter() -> Counter {
+  return AppState.counter
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Todo 액션들
+// ──────────────────────────────────────────────────────────────────────────
+
+func addTodo(text: string, priority: Priority = Priority.MEDIUM) -> Todo {
+  if isEmptyOrNull(text) {
+    AppState.error = "Todo text cannot be empty"
+    return null
+  }
+
+  let newTodo: Todo = {
+    id: generateId(),
+    text: text,
+    done: false,
+    priority: priority,
+    tags: [],
+    createdAt: now(),
+    updatedAt: now()
+  }
+
+  AppState.todos.push(newTodo)
+  AppState.error = null
+
+  recordAction({
+    type: ActionType.ADD_TODO,
+    payload: { text, priority },
+    timestamp: now()
+  })
+
+  return newTodo
+}
+
+func updateTodo(id: number, updates: record) -> Todo {
+  let todo = findTodoById(id)
+  if todo == null {
+    AppState.error = "Todo not found"
+    return null
+  }
+
+  // 부분 업데이트
+  if updates.text != null {
+    todo.text = updates.text
+  }
+  if updates.priority != null {
+    todo.priority = updates.priority
+  }
+  if updates.done != null {
+    todo.done = updates.done
+  }
+  if updates.tags != null {
+    todo.tags = updates.tags
+  }
+
+  todo.updatedAt = now()
+  AppState.error = null
+
+  recordAction({
+    type: ActionType.UPDATE_TODO,
+    payload: { id, updates },
+    timestamp: now()
+  })
+
+  return todo
+}
+
+func toggleTodo(id: number) -> Todo {
+  let todo = findTodoById(id)
+  if todo == null {
+    AppState.error = "Todo not found"
+    return null
+  }
+
+  todo.done = !todo.done
+  todo.updatedAt = now()
+  AppState.error = null
+
+  recordAction({
+    type: ActionType.TOGGLE_TODO,
+    payload: { id },
+    timestamp: now()
+  })
+
+  return todo
+}
+
+func deleteTodo(id: number) -> boolean {
+  let index = findTodoIndexById(id)
+  if index == -1 {
+    AppState.error = "Todo not found"
+    return false
+  }
+
+  AppState.todos.removeAt(index)
+  AppState.error = null
+
+  recordAction({
+    type: ActionType.DELETE_TODO,
+    payload: { id },
+    timestamp: now()
+  })
+
+  return true
+}
+
+func getTodos(filter: string = "all") -> array<Todo> {
+  if filter == "done" {
+    return AppState.todos.filter(todo => todo.done == true)
+  }
+  if filter == "pending" {
+    return AppState.todos.filter(todo => todo.done == false)
+  }
+  return AppState.todos
+}
+
+func getTodoById(id: number) -> Todo {
+  return findTodoById(id)
+}
+
+func searchTodos(query: string) -> array<Todo> {
+  if isEmptyOrNull(query) {
+    return AppState.todos
+  }
+
+  let lowerQuery = query.toLowerCase()
+  return AppState.todos.filter(todo => {
+    return todo.text.toLowerCase().contains(lowerQuery) ||
+           todo.tags.some(tag => tag.toLowerCase().contains(lowerQuery))
+  })
+}
+
+func getTodoStats() -> TodoStats {
+  let done = AppState.todos.filter(t => t.done == true).length
+  let pending = AppState.todos.filter(t => t.done == false).length
+
+  let byPriority = {
+    high: AppState.todos.filter(t => t.priority == Priority.HIGH).length,
+    medium: AppState.todos.filter(t => t.priority == Priority.MEDIUM).length,
+    low: AppState.todos.filter(t => t.priority == Priority.LOW).length
+  }
+
+  return {
+    total: AppState.todos.length,
+    done: done,
+    pending: pending,
+    byPriority: byPriority,
+    byTag: {}  // Todo: 태그별 통계 계산
+  }
+}
+
+func clearAllTodos() -> number {
+  let count = AppState.todos.length
+  AppState.todos = []
+
+  recordAction({
+    type: ActionType.DELETE_TODO,
+    payload: { action: "clear_all", count },
+    timestamp: now()
+  })
+
+  return count
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 시간 여행 디버깅 (히스토리 관리)
+// ──────────────────────────────────────────────────────────────────────────
+
+func saveSnapshot() -> number {
+  let snapshot = cloneState(AppState)
+  AppState.history.push(snapshot)
+  AppState.historyIndex = AppState.history.length - 1
+  return AppState.historyIndex
+}
+
+func undo() -> boolean {
+  if AppState.historyIndex <= 0 {
+    return false
+  }
+
+  AppState.historyIndex -= 1
+  let snapshot = AppState.history[AppState.historyIndex]
+  restoreState(snapshot)
+  return true
+}
+
+func redo() -> boolean {
+  if AppState.historyIndex >= AppState.history.length - 1 {
+    return false
+  }
+
+  AppState.historyIndex += 1
+  let snapshot = AppState.history[AppState.historyIndex]
+  restoreState(snapshot)
+  return true
+}
+
+func getHistory() -> array<record> {
+  return AppState.history
+}
+
+func clearHistory() {
+  AppState.history = []
+  AppState.historyIndex = -1
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 헬퍼 함수들
+// ──────────────────────────────────────────────────────────────────────────
+
+private func findTodoById(id: number) -> Todo {
+  for todo in AppState.todos {
+    if todo.id == id {
+      return todo
+    }
+  }
+  return null
+}
+
+private func findTodoIndexById(id: number) -> number {
+  for i in 0..AppState.todos.length {
+    if AppState.todos[i].id == id {
+      return i
+    }
+  }
+  return -1
+}
+
+private func recordAction(action: Action) {
+  ActionHistory.actions.push(action)
+
+  if ActionHistory.actions.length > ActionHistory.maxSize {
+    ActionHistory.actions.removeAt(0)
+  }
+}
+
+private func isEmptyOrNull(str: string) -> boolean {
+  return str == null || str.trim().length == 0
+}
+
+private func generateId() -> number {
+  return AppState.todos.length + 1
+}
+
+private func now() -> timestamp {
+  return timestamp.now()
+}
+
+private func cloneState(state: AppState) -> record {
+  // Deep clone implementation
+  return state
+}
+
+private func restoreState(snapshot: record) {
+  // Restore from snapshot
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 초기화 및 진입점
+// ──────────────────────────────────────────────────────────────────────────
+
+func initializeAppState() {
+  // 기본값 설정
+  AppState.counter = {
+    id: "main",
+    count: 0,
+    name: "Main Counter",
+    createdAt: now(),
+    updatedAt: now()
+  }
+
+  AppState.todos = []
+  AppState.isLoading = false
+  AppState.error = null
+
+  saveSnapshot()
+}
+
+func getAppState() -> AppState {
+  return AppState
+}

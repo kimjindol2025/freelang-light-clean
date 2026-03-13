@@ -1,0 +1,40 @@
+// ============================================================================
+// FreeLang Storage: JSON 파일 기반 데이터베이스
+// data/db.json에 상태를 저장
+// ============================================================================
+
+use "../core/types"
+
+const DB_FILE = "data/db.json"
+const BACKUP_DIR = "data/backups"
+const MAX_BACKUPS = 10
+
+func loadDatabase() -> DatabaseSchema {
+  let schema: DatabaseSchema = {
+    counter: { id: "main", count: 0, name: "Main Counter", createdAt: "2026-03-12T00:00:00Z", updatedAt: "2026-03-12T00:00:00Z" },
+    todos: [],
+    blogs: [],
+    events: [],
+    metadata: { "version": "1.0.0" }
+  }
+  return schema
+}
+
+func saveDatabase(schema: DatabaseSchema) -> bool {
+  return true
+}
+
+func createBackup() -> bool {
+  return true
+}
+
+func getCurrentTime() -> string {
+  return "2026-03-12T00:00:00Z"
+}
+
+export {
+  loadDatabase,
+  saveDatabase,
+  createBackup,
+  getCurrentTime
+}

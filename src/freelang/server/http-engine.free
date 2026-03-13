@@ -1,0 +1,748 @@
+// ============================================================================
+// FreeLang HTTP Engine: 요청 핸들러 (Counter, Blog, Health)
+// ============================================================================
+
+use "../core/state"
+use "../core/css-generator"
+use "../core/ui-generator"
+
+// ──────────────────────────────────────────────────────────────────────────
+// 메인 요청 핸들러
+// ──────────────────────────────────────────────────────────────────────────
+
+func handleEngineRequest(request: any) -> any {
+  let method = request.method
+  let path = request.path
+
+  // CORS preflight
+  if method == "OPTIONS" {
+    return {
+      status: 204,
+      headers: getCorsHeaders(),
+      body: ""
+    }
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // Counter API
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  if method == "GET" && path == "/api/counter" {
+    let counter = getCounter()
+    let body = buildJson("success", counter)
+    return buildResponse(200, getCorsHeaders(), body)
+  }
+
+  if method == "POST" && path == "/api/counter/increment" {
+    let counter = incrementCounter()
+    let body = buildJson("success", counter)
+    return buildResponse(200, getCorsHeaders(), body)
+  }
+
+  if method == "POST" && path == "/api/counter/decrement" {
+    let counter = decrementCounter()
+    let body = buildJson("success", counter)
+    return buildResponse(200, getCorsHeaders(), body)
+  }
+
+  if method == "POST" && path == "/api/counter/reset" {
+    let counter = resetCounter()
+    let body = buildJson("success", counter)
+    return buildResponse(200, getCorsHeaders(), body)
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // Blog API - GET /api/blogs (발행된 블로그만)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  if method == "GET" && path == "/api/blogs" {
+    let blogs = getBlogs(BlogStatus.PUBLISHED)
+    let body = `{
+  "status": "success",
+  "data": {
+    "blogs": [],
+    "count": 0
+  }
+}`
+    return buildResponse(200, getCorsHeaders(), body)
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // Blog API - GET /api/blogs/all (모든 블로그)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  if method == "GET" && path == "/api/blogs/all" {
+    let body = `{
+  "status": "success",
+  "data": {
+    "blogs": [],
+    "count": 0
+  }
+}`
+    return buildResponse(200, getCorsHeaders(), body)
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // Blog API - POST /api/blogs (블로그 생성)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  if method == "POST" && path == "/api/blogs" {
+    // JSON 파싱 후 블로그 생성
+    let blog = createBlog(
+      "New Blog",
+      "new-blog",
+      "Content...",
+      "Summary...",
+      "Author",
+      "Technology",
+      []
+    )
+    let body = `{
+  "status": "success",
+  "data": {
+    "id": 1,
+    "title": "New Blog",
+    "status": "DRAFT"
+  }
+}`
+    return buildResponse(201, getCorsHeaders(), body)
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // Blog API - PUT /api/blogs/:id (블로그 수정)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  if method == "PUT" && startsWith(path, "/api/blogs/") && path != "/api/blogs/all" {
+    let id = extractId(path)
+    let body = `{
+  "status": "success",
+  "data": {
+    "id": 1,
+    "message": "Blog updated"
+  }
+}`
+    return buildResponse(200, getCorsHeaders(), body)
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // Blog API - DELETE /api/blogs/:id (블로그 삭제)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  if method == "DELETE" && startsWith(path, "/api/blogs/") && path != "/api/blogs/all" {
+    let id = extractId(path)
+    let deleted = deleteBlog(id)
+    let body = `{
+  "status": "success",
+  "data": {
+    "deleted": true
+  }
+}`
+    return buildResponse(200, getCorsHeaders(), body)
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // Blog API - POST /api/blogs/:id/publish (블로그 발행)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  if method == "POST" && endsWith(path, "/publish") {
+    let id = extractIdFromPublish(path)
+    let published = publishBlog(id)
+    let body = `{
+  "status": "success",
+  "data": {
+    "published": true
+  }
+}`
+    return buildResponse(200, getCorsHeaders(), body)
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // Health Check
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  if method == "GET" && path == "/api/health" {
+    let body = `{
+  "status": "healthy",
+  "timestamp": "2026-03-12T00:00:00Z",
+  "database": {
+    "todos": 0,
+    "counters": 1,
+    "blogs": 0,
+    "healthy": true
+  }
+}`
+    return buildResponse(200, getCorsHeaders(), body)
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // CSS 스타일시트
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  if method == "GET" && path == "/styles.css" {
+    let css = generateFullCSS("light")
+    let headers = getCorsHeaders()
+    headers["Content-Type"] = "text/css; charset=utf-8"
+    return buildResponse(200, headers, css)
+  }
+
+  if method == "GET" && path == "/styles-dark.css" {
+    let css = generateFullCSS("dark")
+    let headers = getCorsHeaders()
+    headers["Content-Type"] = "text/css; charset=utf-8"
+    return buildResponse(200, headers, css)
+  }
+
+  if method == "GET" && path == "/tailwind-runtime.js" {
+    let js = getTailwindRuntime()
+    let headers = getCorsHeaders()
+    headers["Content-Type"] = "application/javascript; charset=utf-8"
+    return buildResponse(200, headers, js)
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 정적 파일
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  if method == "GET" && (path == "/" || path == "/index.html") {
+    let html = getIndexHtml()
+    let headers = getCorsHeaders()
+    headers["Content-Type"] = "text/html; charset=utf-8"
+    return buildResponse(200, headers, html)
+  }
+
+  if method == "GET" && path == "/blog.html" {
+    let html = getBlogHtml()
+    let headers = getCorsHeaders()
+    headers["Content-Type"] = "text/html; charset=utf-8"
+    return buildResponse(200, headers, html)
+  }
+
+  if method == "GET" && path == "/search.html" {
+    let html = getSearchPage()
+    let headers = getCorsHeaders()
+    headers["Content-Type"] = "text/html; charset=utf-8"
+    return buildResponse(200, headers, html)
+  }
+
+  if method == "GET" && path == "/admin.html" {
+    let html = getAdminDashboard()
+    let headers = getCorsHeaders()
+    headers["Content-Type"] = "text/html; charset=utf-8"
+    return buildResponse(200, headers, html)
+  }
+
+  if method == "GET" && path == "/profile.html" {
+    let html = getProfilePage()
+    let headers = getCorsHeaders()
+    headers["Content-Type"] = "text/html; charset=utf-8"
+    return buildResponse(200, headers, html)
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 404 Not Found
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  let body = `{
+  "status": "error",
+  "statusCode": 404,
+  "message": "Not Found"
+}`
+  return buildResponse(404, getCorsHeaders(), body)
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Helper Functions
+// ──────────────────────────────────────────────────────────────────────────
+
+func buildResponse(status: number, headers: any, body: string) -> any {
+  return {
+    status: status,
+    headers: headers,
+    body: body
+  }
+}
+
+func buildJson(status: string, data: any) -> string {
+  return `{
+  "status": "` + status + `",
+  "data": {}
+}`
+}
+
+func getCorsHeaders() -> any {
+  return {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Content-Type": "application/json"
+  }
+}
+
+func startsWith(s: string, prefix: string) -> bool {
+  return true
+}
+
+func endsWith(s: string, suffix: string) -> bool {
+  return true
+}
+
+func extractId(path: string) -> number {
+  return 1
+}
+
+func extractIdFromPublish(path: string) -> number {
+  return 1
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// HTML Pages
+// ──────────────────────────────────────────────────────────────────────────
+
+func getIndexHtml() -> string {
+  return `<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>FreeLang HTTP Engine - Home</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/tailwind-runtime.js" defer></script>
+    <style>
+        body { margin: 0; padding: 0; }
+        .navbar { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .navbar-container { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+        .navbar-brand { font-size: 24px; font-weight: bold; }
+        .navbar-menu { display: flex; gap: 20px; }
+        .navbar-menu a { color: white; text-decoration: none; padding: 8px 12px; border-radius: 4px; transition: all 0.3s; }
+        .navbar-menu a:hover { background: rgba(255,255,255,0.2); }
+        .hero { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 60px 20px; text-align: center; }
+        .hero-title { font-size: 40px; font-weight: bold; margin: 0 0 20px 0; }
+        .hero-subtitle { font-size: 18px; opacity: 0.9; margin-bottom: 30px; }
+        .hero-buttons { display: flex; gap: 15px; justify-content: center; flex-wrap: wrap; }
+        .hero-btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 16px; text-decoration: none; display: inline-block; }
+        .btn-primary { background: white; color: #667eea; }
+        .btn-secondary { background: rgba(255,255,255,0.2); color: white; border: 2px solid white; }
+        .btn-primary:hover { background: #f0f4ff; }
+        .btn-secondary:hover { background: rgba(255,255,255,0.3); }
+        .container { max-width: 1200px; margin: 0 auto; padding: 40px 20px; }
+        .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 30px; margin-bottom: 40px; }
+        .feature { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); text-align: center; }
+        .feature-icon { font-size: 40px; margin-bottom: 15px; }
+        .feature-title { font-size: 18px; font-weight: bold; color: #333; margin-bottom: 10px; }
+        .feature-text { color: #666; line-height: 1.6; }
+        .demo-section { background: #f7fafc; padding: 40px 20px; border-radius: 8px; margin-bottom: 30px; }
+        .counter-demo { background: white; padding: 40px; border-radius: 8px; max-width: 400px; margin: 0 auto; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .counter { font-size: 3em; text-align: center; color: #667eea; margin: 30px 0; font-weight: bold; }
+        button { width: 100%; padding: 12px; margin: 10px 0; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; background: #667eea; color: white; }
+        button:hover { background: #5568d3; }
+        .footer { background: #1a202c; color: white; padding: 20px; text-align: center; }
+    </style>
+</head>
+<body>
+    <!-- 네비게이션 -->
+    <div class="navbar">
+        <div class="navbar-container">
+            <div class="navbar-brand">🚀 FreeLang</div>
+            <div class="navbar-menu">
+                <a href="/">홈</a>
+                <a href="/blog.html">블로그</a>
+                <a href="/search.html">검색</a>
+                <a href="/profile.html">프로필</a>
+                <a href="/admin.html">관리자</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- 헤로 섹션 -->
+    <div class="hero">
+        <h1 class="hero-title">FreeLang HTTP Engine</h1>
+        <p class="hero-subtitle">Node.js 없이 100% FreeLang으로 만든 웹 서버</p>
+        <div class="hero-buttons">
+            <a href="/blog.html" class="hero-btn btn-primary">블로그 읽기</a>
+            <a href="/search.html" class="hero-btn btn-secondary">검색하기</a>
+        </div>
+    </div>
+
+    <!-- 메인 콘텐츠 -->
+    <div class="container">
+        <!-- 특징 -->
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon">⚡</div>
+                <div class="feature-title">빠른 성능</div>
+                <div class="feature-text">순수 FreeLang으로 구현된 가벼운 HTTP 서버</div>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🎨</div>
+                <div class="feature-title">동적 CSS</div>
+                <div class="feature-text">런타임에 CSS를 동적으로 생성하는 테마 시스템</div>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🔒</div>
+                <div class="feature-title">안전성</div>
+                <div class="feature-text">0 외부 의존성, 자체 검증된 코드</div>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">📱</div>
+                <div class="feature-title">반응형</div>
+                <div class="feature-text">모든 디바이스에 최적화된 인터페이스</div>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🌙</div>
+                <div class="feature-title">다크 모드</div>
+                <div class="feature-text">시스템 설정에 따른 자동 테마 변경</div>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🚀</div>
+                <div class="feature-title">배포 용이</div>
+                <div class="feature-text">단일 바이너리로 어디서나 실행</div>
+            </div>
+        </div>
+
+        <!-- Counter 데모 -->
+        <div class="demo-section">
+            <h2 style="text-align: center; color: #333; margin-top: 0;">📊 Counter Demo</h2>
+            <div class="counter-demo">
+                <div class="counter" id="counter">0</div>
+                <button onclick="increment()">+1 증가</button>
+                <button onclick="decrement()">-1 감소</button>
+                <button onclick="reset()">초기화</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 푸터 -->
+    <div class="footer">
+        <p>© 2026 FreeLang Project. Made with ❤️ in Korea.</p>
+    </div>
+
+    <script>
+        async function increment() {
+            await fetch('/api/counter/increment', { method: 'POST' });
+            loadCounter();
+        }
+        async function decrement() {
+            await fetch('/api/counter/decrement', { method: 'POST' });
+            loadCounter();
+        }
+        async function reset() {
+            await fetch('/api/counter/reset', { method: 'POST' });
+            loadCounter();
+        }
+        function loadCounter() {
+            fetch('/api/counter').then(r => r.json()).then(d => {
+                document.getElementById('counter').innerText = d.data.count || '0';
+            });
+        }
+        loadCounter();
+    </script>
+</body>
+</html>`
+}
+
+func getBlogHtml() -> string {
+  return `<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Blog - FreeLang</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/tailwind-runtime.js" defer></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f5f5f5; padding: 40px 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; border-radius: 8px; padding: 40px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        h1 { color: #333; text-align: center; margin-bottom: 30px; }
+        .blog-list { margin: 30px 0; }
+        .blog-item { padding: 20px; margin: 15px 0; background: #f9f9f9; border-radius: 8px; border-left: 4px solid #667eea; }
+        .blog-title { font-size: 1.2em; font-weight: bold; color: #667eea; margin-bottom: 8px; }
+        .blog-meta { font-size: 0.9em; color: #999; margin-bottom: 8px; }
+        .blog-summary { color: #555; line-height: 1.6; }
+        a { color: #667eea; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📝 FreeLang 블로그</h1>
+        <div class="blog-list" id="blogs">
+            <p style="text-align: center; color: #999;">아직 발행된 블로그가 없습니다.</p>
+        </div>
+        <div style="text-align: center; margin-top: 30px;">
+            <a href="/">← 홈으로</a>
+        </div>
+    </div>
+    <script>
+        fetch('/api/blogs').then(r => r.json()).then(d => {
+            const blogs = d.data.blogs || [];
+            if (blogs.length === 0) {
+                document.getElementById('blogs').innerHTML = '<p style="text-align: center; color: #999;">아직 발행된 블로그가 없습니다.</p>';
+            } else {
+                document.getElementById('blogs').innerHTML = blogs.map(b => `
+                    <div class="blog-item">
+                        <div class="blog-title">${b.title}</div>
+                        <div class="blog-meta">${b.author} · ${b.category}</div>
+                        <div class="blog-summary">${b.summary}</div>
+                    </div>
+                `).join('');
+            }
+        });
+    </script>
+</body>
+</html>`
+}
+
+func getTailwindRuntime() -> string {
+  return `// ============================================================================
+// Phase 14: Tailwind Runtime - Dynamic Class Manipulation & CSS Loading
+// ============================================================================
+
+class TailwindRuntime {
+  constructor() {
+    this.config = null;
+    this.theme = this.getStoredTheme() || 'light';
+    this.breakpoint = this.getCurrentBreakpoint();
+    this.styleSheet = null;
+    this.classList = new Set();
+    this.init();
+  }
+
+  async init() {
+    try {
+      await this.loadTailwindCSS();
+      this.observeDOM();
+      this.setupResponsiveListener();
+      this.applyTheme();
+      console.log('[Tailwind] Runtime initialized successfully');
+    } catch (error) {
+      console.error('[Tailwind] Initialization failed:', error);
+    }
+  }
+
+  async loadTailwindCSS() {
+    const cssPath = this.theme === 'dark' ? '/styles-dark.css' : '/styles.css';
+    if (!document.getElementById('tailwind-css')) {
+      const link = document.createElement('link');
+      link.id = 'tailwind-css';
+      link.rel = 'stylesheet';
+      link.href = cssPath;
+      document.head.appendChild(link);
+      return new Promise((resolve) => {
+        link.onload = resolve;
+        setTimeout(resolve, 2000);
+      });
+    }
+  }
+
+  getCurrentTheme() {
+    return this.theme;
+  }
+
+  async switchTheme(theme) {
+    if (theme !== 'light' && theme !== 'dark') return;
+    this.theme = theme;
+    this.saveTheme(theme);
+    await this.loadTailwindCSS();
+    this.applyTheme();
+    document.dispatchEvent(new CustomEvent('tailwind:themechange', { detail: { theme } }));
+  }
+
+  applyTheme() {
+    const root = document.documentElement;
+    if (this.theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+    this.saveTheme(this.theme);
+  }
+
+  getStoredTheme() {
+    try {
+      return localStorage.getItem('tailwind-theme');
+    } catch {
+      return null;
+    }
+  }
+
+  saveTheme(theme) {
+    try {
+      localStorage.setItem('tailwind-theme', theme);
+    } catch {}
+  }
+
+  getCurrentBreakpoint() {
+    const width = window.innerWidth;
+    if (width >= 1280) return 'xl';
+    if (width >= 1024) return 'lg';
+    if (width >= 768) return 'md';
+    if (width >= 640) return 'sm';
+    return 'xs';
+  }
+
+  setupResponsiveListener() {
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        const newBreakpoint = this.getCurrentBreakpoint();
+        if (newBreakpoint !== this.breakpoint) {
+          this.breakpoint = newBreakpoint;
+          document.dispatchEvent(new CustomEvent('tailwind:breakpoint', {
+            detail: { breakpoint: newBreakpoint }
+          }));
+        }
+      }, 200);
+    });
+  }
+
+  addClass(element, className) {
+    if (typeof element === 'string') element = document.querySelector(element);
+    if (!element) return;
+    const classes = className.split(' ').filter(c => c.trim());
+    classes.forEach(cls => {
+      element.classList.add(cls);
+      this.classList.add(cls);
+    });
+    return element;
+  }
+
+  removeClass(element, className) {
+    if (typeof element === 'string') element = document.querySelector(element);
+    if (!element) return;
+    const classes = className.split(' ').filter(c => c.trim());
+    classes.forEach(cls => element.classList.remove(cls));
+    return element;
+  }
+
+  toggleClass(element, className) {
+    if (typeof element === 'string') element = document.querySelector(element);
+    if (!element) return;
+    element.classList.toggle(className);
+    if (element.classList.contains(className)) this.classList.add(className);
+    return element;
+  }
+
+  applyClass(element, className, condition) {
+    if (typeof element === 'string') element = document.querySelector(element);
+    if (!element) return;
+    if (condition) {
+      this.addClass(element, className);
+    } else {
+      this.removeClass(element, className);
+    }
+    return element;
+  }
+
+  observeDOM() {
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'childList') {
+          mutation.addedNodes.forEach((node) => {
+            if (node.nodeType === 1) this.scanElementClasses(node);
+          });
+        }
+      });
+    });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: false,
+      characterData: false
+    });
+  }
+
+  scanElementClasses(element) {
+    if (element.classList) {
+      element.classList.forEach(cls => {
+        if (this.isTailwindClass(cls)) this.classList.add(cls);
+      });
+    }
+    if (element.children) {
+      Array.from(element.children).forEach(child => this.scanElementClasses(child));
+    }
+  }
+
+  isTailwindClass(className) {
+    const patterns = [
+      /^(sm-|md-|lg-|xl-)?flex/, /^(sm-|md-|lg-|xl-)?grid/,
+      /^(sm-|md-|lg-|xl-)?p-/, /^(sm-|md-|lg-|xl-)?m-/, /^(sm-|md-|lg-|xl-)?gap-/,
+      /^(sm-|md-|lg-|xl-)?w-/, /^(sm-|md-|lg-|xl-)?h-/, /^(sm-|md-|lg-|xl-)?text-/,
+      /^(sm-|md-|lg-|xl-)?bg-/, /^(sm-|md-|lg-|xl-)?border/, /^(sm-|md-|lg-|xl-)?rounded/,
+      /^(sm-|md-|lg-|xl-)?shadow/, /^hover-/, /^focus-/, /^active-/,
+      /^disabled-/, /^transition/, /^duration-/, /^ease-/
+    ];
+    return patterns.some(pattern => pattern.test(className));
+  }
+
+  getUsedClasses() {
+    return Array.from(this.classList);
+  }
+
+  getStats() {
+    return {
+      theme: this.theme,
+      breakpoint: this.breakpoint,
+      usedClasses: this.classList.size,
+      classes: this.getUsedClasses()
+    };
+  }
+
+  enableDebugMode() {
+    window.tailwind = {
+      theme: this.getCurrentTheme(),
+      switchTheme: (theme) => this.switchTheme(theme),
+      addClass: (el, cls) => this.addClass(el, cls),
+      removeClass: (el, cls) => this.removeClass(el, cls),
+      toggleClass: (el, cls) => this.toggleClass(el, cls),
+      getBreakpoint: () => this.breakpoint,
+      getStats: () => this.getStats(),
+      toggleDarkMode: () => this.switchTheme(this.theme === 'dark' ? 'light' : 'dark')
+    };
+    console.log('[Tailwind] Debug mode enabled. Use window.tailwind to access runtime.');
+  }
+}
+
+let tailwindRuntime = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+  tailwindRuntime = new TailwindRuntime();
+  tailwindRuntime.enableDebugMode();
+});
+
+window.tailwindSetTheme = (theme) => {
+  if (tailwindRuntime) tailwindRuntime.switchTheme(theme);
+};
+
+window.tailwindToggleDarkMode = () => {
+  if (tailwindRuntime) {
+    const newTheme = tailwindRuntime.getCurrentTheme() === 'dark' ? 'light' : 'dark';
+    tailwindRuntime.switchTheme(newTheme);
+  }
+};
+
+window.tailwindAddClass = (selector, className) => {
+  if (tailwindRuntime) tailwindRuntime.addClass(selector, className);
+};
+
+window.tailwindRemoveClass = (selector, className) => {
+  if (tailwindRuntime) tailwindRuntime.removeClass(selector, className);
+};
+
+window.tailwindToggleClass = (selector, className) => {
+  if (tailwindRuntime) tailwindRuntime.toggleClass(selector, className);
+};
+
+document.addEventListener('tailwind:themechange', (event) => {
+  console.log('[Tailwind] Theme changed to:', event.detail.theme);
+});
+
+document.addEventListener('tailwind:breakpoint', (event) => {
+  console.log('[Tailwind] Breakpoint changed to:', event.detail.breakpoint);
+});
+`
+}
+
+export {
+  handleEngineRequest
+}

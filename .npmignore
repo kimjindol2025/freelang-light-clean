@@ -1,0 +1,13 @@
+tests/
+*.test.ts
+src/
+docs/
+examples/
+.git*
+.github/
+jest.config.js
+tsconfig.json
+*.md
+!README.md
+!LICENSE
+!CHANGELOG.md

@@ -1,0 +1,40 @@
+# GitHub Pages & Jekyll Configuration
+# FreeLang Light - Web Frontend Language
+
+# Site metadata
+title: FreeLang Light
+description: 웹 프론트엔드 개발을 위한 통합 언어
+author: Kim Jindol
+url: https://github.com/kimjindol2025/freelang-light
+
+# Theme
+theme: jekyll-theme-primer
+
+# Build settings
+markdown: kramdown
+kramdown:
+  input: GFM
+  hard_wrap: false
+
+# Exclude directories that cause issues
+exclude:
+  - freelang
+  - backend
+  - config
+  - node_modules
+  - .backups
+  - .patch_backups
+  - .freelang-ai-out
+  - .kpm-registry
+  - __pycache__
+  - .git
+  - .github
+
+# Repository
+repository: kimjindol2025/freelang-light
+
+# Plugins
+plugins:
+  - jekyll-github-metadata
+  - jekyll-seo-tag
+  - jekyll-readme-index

@@ -1,0 +1,84 @@
+# ============================================================================
+# Prometheus Recording Rules for FreeLang Blog
+# ============================================================================
+# 사전 계산된 메트릭: 자주 사용되는 쿼리를 미리 계산하여 저장
+
+groups:
+  - name: freelang_recording
+    interval: 15s
+    rules:
+      # 1. HTTP 요청 레이트 (초당 요청 수)
+      - record: freelang:http:requests:rate1m
+        expr: rate(http_requests_total[1m])
+
+      - record: freelang:http:requests:rate5m
+        expr: rate(http_requests_total[5m])
+
+      - record: freelang:http:requests:rate1h
+        expr: rate(http_requests_total[1h])
+
+      # 2. 상태 코드별 요청 비율
+      - record: freelang:http:success_rate:1m
+        expr: rate(http_requests_total{status=~"2.."}[1m]) / rate(http_requests_total[1m])
+
+      - record: freelang:http:error_rate:1m
+        expr: rate(http_requests_total{status=~"5.."}[1m]) / rate(http_requests_total[1m])
+
+      # 3. 메서드별 평균 응답 시간
+      - record: freelang:http:latency:avg:1m
+        expr: avg by (method) (rate(http_request_duration_seconds_sum[1m]) / rate(http_request_duration_seconds_count[1m]))
+
+      - record: freelang:http:latency:p99:1m
+        expr: histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[1m]))
+
+      - record: freelang:http:latency:p95:1m
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[1m]))
+
+      # 4. 데이터베이스 성능
+      - record: freelang:db:query_time:avg
+        expr: avg by (query_type) (rate(db_query_duration_seconds_sum[5m]) / rate(db_query_duration_seconds_count[5m]))
+
+      - record: freelang:db:connection_pool:usage
+        expr: db_connections_active / db_connections_max
+
+      # 5. 캐시 성능
+      - record: freelang:cache:hit_rate:1m
+        expr: rate(cache_hits_total[1m]) / rate(cache_requests_total[1m])
+
+      - record: freelang:cache:miss_rate:1m
+        expr: rate(cache_misses_total[1m]) / rate(cache_requests_total[1m])
+
+      # 6. 시스템 리소스 사용률
+      - record: freelang:system:memory_usage_percent
+        expr: (1 - (container_memory_available_bytes / container_memory_total_bytes)) * 100
+
+      - record: freelang:system:cpu_usage_percent
+        expr: rate(container_cpu_usage_seconds_total[1m]) * 100
+
+      # 7. 로그 통계
+      - record: freelang:logs:error_rate:1m
+        expr: rate(log_messages_total{level="ERROR"}[1m])
+
+      - record: freelang:logs:warn_rate:1m
+        expr: rate(log_messages_total{level="WARN"}[1m])
+
+      # 8. 비즈니스 메트릭
+      - record: freelang:posts:created_rate:1d
+        expr: rate(posts_created_total[1d])
+
+      - record: freelang:posts:viewed_rate:1h
+        expr: rate(posts_viewed_total[1h])
+
+      - record: freelang:comments:count
+        expr: comments_total
+
+      # 9. 검색 성능
+      - record: freelang:search:query_time:avg
+        expr: avg(rate(search_query_duration_seconds_sum[5m]) / rate(search_query_duration_seconds_count[5m]))
+
+      - record: freelang:search:result_count:avg
+        expr: avg(search_result_count)
+
+      # 10. 업타임 추적
+      - record: freelang:uptime:days
+        expr: up{job="freelang-blog"} / (24 * 3600)

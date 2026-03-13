@@ -1,0 +1,573 @@
+// FreeLang Self-Hosting: IR Generator
+// Phase 3C — AST → IR instruction array
+// Depends on: types.fl opcodes (inlined), bootstrap-v2.fl parser AST format
+
+// ── Opcodes (inlined from types.fl) ──
+let OP_PUSH = 1;
+let OP_POP = 2;
+let OP_PUSH_FLOAT = 4;
+let OP_ADD = 16;
+let OP_SUB = 17;
+let OP_MUL = 18;
+let OP_DIV = 19;
+let OP_MOD = 20;
+let OP_NEG = 21;
+let OP_EQ = 32;
+let OP_NEQ = 33;
+let OP_LT = 34;
+let OP_GT = 35;
+let OP_LTE = 36;
+let OP_GTE = 37;
+let OP_AND = 48;
+let OP_OR = 49;
+let OP_NOT = 50;
+let OP_STORE = 64;
+let OP_LOAD = 65;
+let OP_JMP = 80;
+let OP_JMP_IF = 81;
+let OP_JMP_NOT = 82;
+let OP_CALL = 83;
+let OP_RET = 84;
+let OP_HALT = 95;
+let OP_ARR_NEW = 96;
+let OP_ARR_PUSH = 97;
+let OP_ARR_GET = 98;
+let OP_ARR_SET = 99;
+let OP_STR_NEW = 144;
+let OP_STR_CONCAT = 148;
+let OP_OBJ_NEW = 192;
+let OP_OBJ_SET = 193;
+let OP_OBJ_GET = 194;
+let OP_FUNC_DEF = 163;
+
+// ── Helper: make IR instruction ──
+fn inst(op, arg) {
+  return { op: op, arg: arg };
+}
+
+// ── Helper: patch jump target (workaround for out[idx].arg = val) ──
+fn patchJmp(out, idx, target) {
+  let i = out[idx];
+  i.arg = target;
+}
+
+// ── Binary operator → opcode mapping ──
+fn binOpToCode(op) {
+  if op == "+" { return OP_ADD; }
+  if op == "-" { return OP_SUB; }
+  if op == "*" { return OP_MUL; }
+  if op == "/" { return OP_DIV; }
+  if op == "%" { return OP_MOD; }
+  if op == "==" { return OP_EQ; }
+  if op == "!=" { return OP_NEQ; }
+  if op == "<" { return OP_LT; }
+  if op == ">" { return OP_GT; }
+  if op == "<=" { return OP_LTE; }
+  if op == ">=" { return OP_GTE; }
+  if op == "&&" { return OP_AND; }
+  if op == "||" { return OP_OR; }
+  return -1;
+}
+
+// ── Core: traverse AST node, emit IR into out[] ──
+// Loop context for break/continue
+let _loopStack = [];
+
+fn traverse(node, out) {
+  if node == null { return; }
+  let t = node.type;
+
+  // ── Literals ──
+  if t == "num" {
+    push(out, inst(OP_PUSH, node.value * 1));
+    return;
+  }
+  if t == "str" {
+    push(out, inst(OP_STR_NEW, node.value));
+    return;
+  }
+  if t == "bool" {
+    if node.value { push(out, inst(OP_PUSH, 1)); }
+    else { push(out, inst(OP_PUSH, 0)); }
+    return;
+  }
+  if t == "null" {
+    push(out, inst(OP_PUSH, null));
+    return;
+  }
+
+  // ── Identifier ──
+  if t == "ident" {
+    push(out, inst(OP_LOAD, node.name));
+    return;
+  }
+
+  // ── Binary ──
+  if t == "binary" {
+    traverse(node.left, out);
+    traverse(node.right, out);
+    let opCode = binOpToCode(node.op);
+    if opCode == -1 {
+      // string concat for "+"
+      push(out, inst(OP_STR_CONCAT, null));
+    } else {
+      push(out, inst(opCode, null));
+    }
+    return;
+  }
+
+  // ── Unary ──
+  if t == "unary" {
+    traverse(node.expr, out);
+    if node.op == "-" { push(out, inst(OP_NEG, null)); }
+    else if node.op == "!" { push(out, inst(OP_NOT, null)); }
+    return;
+  }
+
+  // ── Call ──
+  if t == "call" {
+    if node.args != null {
+      let i = 0;
+      while i < length(node.args) {
+        traverse(node.args[i], out);
+        i = i + 1;
+      }
+    }
+    push(out, inst(OP_CALL, node.name));
+    return;
+  }
+
+  // ── Member access: obj.field ──
+  if t == "member" {
+    traverse(node.obj, out);
+    push(out, inst(OP_STR_NEW, node.field));
+    push(out, inst(OP_OBJ_GET, null));
+    return;
+  }
+
+  // ── Index access: obj[idx] ──
+  if t == "index" {
+    traverse(node.obj, out);
+    traverse(node.idx, out);
+    push(out, inst(OP_ARR_GET, null));
+    return;
+  }
+
+  // ── Array literal ──
+  if t == "array" {
+    push(out, inst(OP_ARR_NEW, null));
+    let i = 0;
+    while i < length(node.elems) {
+      traverse(node.elems[i], out);
+      push(out, inst(OP_ARR_PUSH, null));
+      i = i + 1;
+    }
+    return;
+  }
+
+  // ── Object literal ──
+  if t == "object" {
+    push(out, inst(OP_OBJ_NEW, null));
+    let i = 0;
+    while i < length(node.props) {
+      push(out, inst(OP_STR_NEW, node.props[i].key));
+      traverse(node.props[i].val, out);
+      push(out, inst(OP_OBJ_SET, null));
+      i = i + 1;
+    }
+    return;
+  }
+
+  // ── Assignment: target = value ──
+  if t == "assign" {
+    traverse(node.value, out);
+    if node.target.type == "ident" {
+      push(out, inst(OP_STORE, node.target.name));
+    } else if node.target.type == "index" {
+      // arr[i] = val → val already on stack
+      traverse(node.target.obj, out);
+      traverse(node.target.idx, out);
+      push(out, inst(OP_ARR_SET, null));
+    } else if node.target.type == "member" {
+      // obj.field = val
+      traverse(node.target.obj, out);
+      push(out, inst(OP_STR_NEW, node.target.field));
+      push(out, inst(OP_OBJ_SET, null));
+    }
+    return;
+  }
+
+  // ── Variable declaration ──
+  if t == "var" {
+    if node.init != null {
+      traverse(node.init, out);
+    } else {
+      push(out, inst(OP_PUSH, null));
+    }
+    push(out, inst(OP_STORE, node.name));
+    return;
+  }
+
+  // ── If statement ──
+  if t == "if" {
+    traverse(node.cond, out);
+    let jmpNotIdx = length(out);
+    push(out, inst(OP_JMP_NOT, 0)); // placeholder
+    traverse(node.then, out);
+    if node.else_b != null {
+      let jmpEndIdx = length(out);
+      push(out, inst(OP_JMP, 0)); // placeholder
+      patchJmp(out, jmpNotIdx, length(out)); // patch: jump to else
+      traverse(node.else_b, out);
+      patchJmp(out, jmpEndIdx, length(out)); // patch: jump to end
+    } else {
+      patchJmp(out, jmpNotIdx, length(out)); // patch: jump past then
+    }
+    return;
+  }
+
+  // ── While statement ──
+  if t == "while" {
+    let loopStart = length(out);
+    // Push loop context for break/continue
+    let loopCtx = { start: loopStart, breaks: [] };
+    push(_loopStack, loopCtx);
+
+    traverse(node.cond, out);
+    let jmpNotIdx = length(out);
+    push(out, inst(OP_JMP_NOT, 0)); // placeholder
+
+    traverse(node.body, out);
+    push(out, inst(OP_JMP, loopStart)); // loop back
+
+    let loopEnd = length(out);
+    patchJmp(out, jmpNotIdx, loopEnd); // patch: exit loop
+
+    // Patch all break jumps
+    let bi = 0;
+    while bi < length(loopCtx.breaks) {
+      patchJmp(out, loopCtx.breaks[bi], loopEnd);
+      bi = bi + 1;
+    }
+
+    // Pop loop context
+    pop(_loopStack);
+    return;
+  }
+
+  // ── Return ──
+  if t == "return" {
+    if node.value != null {
+      traverse(node.value, out);
+    } else {
+      push(out, inst(OP_PUSH, null));
+    }
+    push(out, inst(OP_RET, null));
+    return;
+  }
+
+  // ── Break ──
+  if t == "break" {
+    if length(_loopStack) > 0 {
+      let ctx = _loopStack[length(_loopStack) - 1];
+      let breakIdx = length(out);
+      push(out, inst(OP_JMP, 0)); // placeholder, patched later
+      push(ctx.breaks, breakIdx);
+    }
+    return;
+  }
+
+  // ── Continue ──
+  if t == "continue" {
+    if length(_loopStack) > 0 {
+      let ctx = _loopStack[length(_loopStack) - 1];
+      push(out, inst(OP_JMP, ctx.start));
+    }
+    return;
+  }
+
+  // ── Function declaration ──
+  if t == "fn" {
+    let bodyIR = [];
+    traverse(node.body, bodyIR);
+    // Ensure function ends with RET
+    if length(bodyIR) == 0 || bodyIR[length(bodyIR) - 1].op != OP_RET {
+      push(bodyIR, inst(OP_PUSH, null));
+      push(bodyIR, inst(OP_RET, null));
+    }
+    push(out, { op: OP_FUNC_DEF, arg: node.name, params: node.params, sub: bodyIR });
+    return;
+  }
+
+  // ── Block ──
+  if t == "block" {
+    let i = 0;
+    while i < length(node.stmts) {
+      traverse(node.stmts[i], out);
+      i = i + 1;
+    }
+    return;
+  }
+
+  // ── Expression statement ──
+  if t == "expr_stmt" {
+    traverse(node.expr, out);
+    // assign/var already consume stack value via STORE, skip POP
+    if node.expr.type != "assign" {
+      push(out, inst(OP_POP, null));
+    }
+    return;
+  }
+
+  // ── Program (top-level) ──
+  if t == "program" {
+    let i = 0;
+    while i < length(node.stmts) {
+      traverse(node.stmts[i], out);
+      i = i + 1;
+    }
+    push(out, inst(OP_HALT, null));
+    return;
+  }
+
+  // Unknown node type — skip with warning
+  println("WARN: unknown AST type: " + t);
+}
+
+// ── Public API ──
+fn generateIR(ast) {
+  let out = [];
+  traverse(ast, out);
+  return out;
+}
+
+// ── IR debug printer ──
+fn opName(op) {
+  if op == 1 { return "PUSH"; }
+  if op == 2 { return "POP"; }
+  if op == 4 { return "PUSH_FLOAT"; }
+  if op == 16 { return "ADD"; }
+  if op == 17 { return "SUB"; }
+  if op == 18 { return "MUL"; }
+  if op == 19 { return "DIV"; }
+  if op == 20 { return "MOD"; }
+  if op == 21 { return "NEG"; }
+  if op == 32 { return "EQ"; }
+  if op == 33 { return "NEQ"; }
+  if op == 34 { return "LT"; }
+  if op == 35 { return "GT"; }
+  if op == 36 { return "LTE"; }
+  if op == 37 { return "GTE"; }
+  if op == 48 { return "AND"; }
+  if op == 49 { return "OR"; }
+  if op == 50 { return "NOT"; }
+  if op == 64 { return "STORE"; }
+  if op == 65 { return "LOAD"; }
+  if op == 80 { return "JMP"; }
+  if op == 81 { return "JMP_IF"; }
+  if op == 82 { return "JMP_NOT"; }
+  if op == 83 { return "CALL"; }
+  if op == 84 { return "RET"; }
+  if op == 95 { return "HALT"; }
+  if op == 96 { return "ARR_NEW"; }
+  if op == 97 { return "ARR_PUSH"; }
+  if op == 98 { return "ARR_GET"; }
+  if op == 99 { return "ARR_SET"; }
+  if op == 144 { return "STR_NEW"; }
+  if op == 148 { return "STR_CONCAT"; }
+  if op == 163 { return "FUNC_DEF"; }
+  if op == 192 { return "OBJ_NEW"; }
+  if op == 193 { return "OBJ_SET"; }
+  if op == 194 { return "OBJ_GET"; }
+  return "OP_" + str(op);
+}
+
+fn printIR(ir) {
+  let i = 0;
+  while i < length(ir) {
+    let name = opName(ir[i].op);
+    if ir[i].arg != null {
+      println("  " + str(i) + ": " + name + " " + str(ir[i].arg));
+    } else {
+      println("  " + str(i) + ": " + name);
+    }
+    i = i + 1;
+  }
+}
+
+// ══════════════════════════════════════════════════
+// TESTS
+// ══════════════════════════════════════════════════
+
+fn main() {
+  println("=== Phase 3C: IR Generator Tests ===");
+  let pass = 0;
+  let fail = 0;
+
+  // Test 1: Number literal
+  let ast1 = { type: "num", value: 42 };
+  let ir1 = generateIR(ast1);
+  if length(ir1) == 1 && ir1[0].op == OP_PUSH && ir1[0].arg == 42 {
+    println("T1 num literal: PASS");
+    pass = pass + 1;
+  } else {
+    println("T1 num literal: FAIL");
+    fail = fail + 1;
+  }
+
+  // Test 2: Binary add
+  let ast2 = { type: "binary", op: "+", left: { type: "num", value: 1 }, right: { type: "num", value: 2 } };
+  let ir2 = generateIR(ast2);
+  if length(ir2) == 3 && ir2[2].op == OP_ADD {
+    println("T2 binary add: PASS");
+    pass = pass + 1;
+  } else {
+    println("T2 binary add: FAIL");
+    fail = fail + 1;
+  }
+
+  // Test 3: Variable declaration
+  let ast3 = { type: "var", name: "x", init: { type: "num", value: 10 } };
+  let ir3 = generateIR(ast3);
+  if length(ir3) == 2 && ir3[0].op == OP_PUSH && ir3[1].op == OP_STORE && ir3[1].arg == "x" {
+    println("T3 var decl: PASS");
+    pass = pass + 1;
+  } else {
+    println("T3 var decl: FAIL");
+    fail = fail + 1;
+  }
+
+  // Test 4: Identifier
+  let ast4 = { type: "ident", name: "y" };
+  let ir4 = generateIR(ast4);
+  if length(ir4) == 1 && ir4[0].op == OP_LOAD && ir4[0].arg == "y" {
+    println("T4 ident: PASS");
+    pass = pass + 1;
+  } else {
+    println("T4 ident: FAIL");
+    fail = fail + 1;
+  }
+
+  // Test 5: String literal
+  let ast5 = { type: "str", value: "hello" };
+  let ir5 = generateIR(ast5);
+  if length(ir5) == 1 && ir5[0].op == OP_STR_NEW && ir5[0].arg == "hello" {
+    println("T5 string: PASS");
+    pass = pass + 1;
+  } else {
+    println("T5 string: FAIL");
+    fail = fail + 1;
+  }
+
+  // Test 6: Function declaration
+  let ast6 = { type: "fn", name: "add", params: ["a", "b"], body: { type: "block", stmts: [
+    { type: "return", value: { type: "binary", op: "+", left: { type: "ident", name: "a" }, right: { type: "ident", name: "b" } } }
+  ] } };
+  let ir6 = generateIR(ast6);
+  if length(ir6) == 1 && ir6[0].op == OP_FUNC_DEF && ir6[0].arg == "add" {
+    println("T6 fn decl: PASS");
+    pass = pass + 1;
+    // Check sub-IR: LOAD a, LOAD b, ADD, RET
+    if ir6[0].sub != null && length(ir6[0].sub) == 4 {
+      println("  sub-IR: " + str(length(ir6[0].sub)) + " instructions (correct)");
+    }
+  } else {
+    println("T6 fn decl: FAIL");
+    fail = fail + 1;
+  }
+
+  // Test 7: If statement
+  let ast7 = { type: "if", cond: { type: "bool", value: true }, then: { type: "block", stmts: [
+    { type: "expr_stmt", expr: { type: "call", name: "println", args: [{ type: "str", value: "yes" }] } }
+  ] } };
+  let ir7 = generateIR(ast7);
+  // PUSH 1, JMP_NOT ?, STR_NEW "yes", CALL println, POP
+  if length(ir7) >= 4 && ir7[0].op == OP_PUSH && ir7[1].op == OP_JMP_NOT {
+    println("T7 if stmt: PASS");
+    pass = pass + 1;
+  } else {
+    println("T7 if stmt: FAIL");
+    fail = fail + 1;
+  }
+
+  // Test 8: While loop
+  let ast8 = { type: "while", cond: { type: "ident", name: "running" }, body: { type: "block", stmts: [
+    { type: "break" }
+  ] } };
+  let ir8 = generateIR(ast8);
+  // LOAD running, JMP_NOT end, JMP end(break), JMP start
+  if length(ir8) >= 3 && ir8[0].op == OP_LOAD && ir8[1].op == OP_JMP_NOT {
+    println("T8 while loop: PASS");
+    pass = pass + 1;
+  } else {
+    println("T8 while loop: FAIL");
+    fail = fail + 1;
+  }
+
+  // Test 9: Array literal
+  let ast9 = { type: "array", elems: [{ type: "num", value: 1 }, { type: "num", value: 2 }] };
+  let ir9 = generateIR(ast9);
+  // ARR_NEW, PUSH 1, ARR_PUSH, PUSH 2, ARR_PUSH
+  if length(ir9) == 5 && ir9[0].op == OP_ARR_NEW {
+    println("T9 array: PASS");
+    pass = pass + 1;
+  } else {
+    println("T9 array: FAIL (len=" + str(length(ir9)) + ")");
+    fail = fail + 1;
+  }
+
+  // Test 10: Object literal
+  let ast10 = { type: "object", props: [{ key: "x", val: { type: "num", value: 1 } }] };
+  let ir10 = generateIR(ast10);
+  // OBJ_NEW, STR_NEW "x", PUSH 1, OBJ_SET
+  if length(ir10) == 4 && ir10[0].op == OP_OBJ_NEW && ir10[3].op == OP_OBJ_SET {
+    println("T10 object: PASS");
+    pass = pass + 1;
+  } else {
+    println("T10 object: FAIL");
+    fail = fail + 1;
+  }
+
+  // Test 11: Program with HALT
+  let ast11 = { type: "program", stmts: [{ type: "var", name: "x", init: { type: "num", value: 1 } }] };
+  let ir11 = generateIR(ast11);
+  if ir11[length(ir11) - 1].op == OP_HALT {
+    println("T11 program HALT: PASS");
+    pass = pass + 1;
+  } else {
+    println("T11 program HALT: FAIL");
+    fail = fail + 1;
+  }
+
+  // Test 12: Call with args
+  let ast12 = { type: "call", name: "add", args: [{ type: "num", value: 3 }, { type: "num", value: 4 }] };
+  let ir12 = generateIR(ast12);
+  // PUSH 3, PUSH 4, CALL add
+  if length(ir12) == 3 && ir12[2].op == OP_CALL && ir12[2].arg == "add" {
+    println("T12 call: PASS");
+    pass = pass + 1;
+  } else {
+    println("T12 call: FAIL");
+    fail = fail + 1;
+  }
+
+  // Test 13: Member access
+  let ast13 = { type: "member", obj: { type: "ident", name: "obj" }, field: "name" };
+  let ir13 = generateIR(ast13);
+  // LOAD obj, STR_NEW "name", OBJ_GET
+  if length(ir13) == 3 && ir13[0].op == OP_LOAD && ir13[1].op == OP_STR_NEW && ir13[2].op == OP_OBJ_GET {
+    println("T13 member: PASS");
+    pass = pass + 1;
+  } else {
+    println("T13 member: FAIL");
+    fail = fail + 1;
+  }
+
+  println("");
+  println("Results: " + str(pass) + "/" + str(pass + fail) + " passed");
+  if fail == 0 {
+    println("Phase 3C: ALL TESTS PASSED!");
+  }
+}
+
+main();

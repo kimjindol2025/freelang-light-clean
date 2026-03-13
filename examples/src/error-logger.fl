@@ -1,0 +1,249 @@
+// ============================================================================
+// FreeLang Error Logger - 에러/경고/정보 로깅 모듈
+// ============================================================================
+// 기능: 다중 레벨 로깅, 파일 저장, 타임스탬프, 컨텍스트 추가
+// 저장: /logs/app.log (로그 로테이션 7일 자동 삭제)
+
+use std::io::*
+use std::fs::*
+use "./file-io"
+
+pub struct ErrorLog {
+  level: string,        // ERROR, WARN, INFO, DEBUG
+  message: string,
+  stack_trace: string,
+  context: string,
+  timestamp: i64
+}
+
+pub struct LoggerConfig {
+  log_dir: string,
+  log_file: string,
+  min_level: string,    // 로그 레벨 필터 (DEBUG=모두, ERROR=에러만)
+  max_size_mb: i32,     // 파일 크기 제한
+  retention_days: i32   // 보관 기간
+}
+
+// 글로벌 설정
+let LOGGER_CONFIG = LoggerConfig {
+  log_dir: "/logs",
+  log_file: "/logs/app.log",
+  min_level: "DEBUG",
+  max_size_mb: 100,
+  retention_days: 7
+}
+
+// 글로벌 로그 통계
+pub struct LogStats {
+  total_logs: i32,
+  error_count: i32,
+  warn_count: i32,
+  info_count: i32,
+  debug_count: i32
+}
+
+let GLOBAL_LOG_STATS = LogStats {
+  total_logs: 0,
+  error_count: 0,
+  warn_count: 0,
+  info_count: 0,
+  debug_count: 0
+}
+
+// ============================================================================
+// 로거 초기화
+// ============================================================================
+
+pub fn logger_init(config: LoggerConfig) -> Result<void, string>
+  intent "로거 초기화 및 로그 디렉토리 생성"
+  do
+    // 로그 디렉토리 생성 (필요시)
+    match file_io::create_directory(config.log_dir)
+      Ok(()) => {
+        println("✅ 로그 디렉토리 준비: " + config.log_dir)
+        return Ok(())
+      }
+      Err(e) => {
+        println("⚠️  로그 디렉토리 생성 실패: " + e)
+        return Err(e)
+      }
+    end
+  end
+
+// ============================================================================
+// 레벨별 로깅 함수
+// ============================================================================
+
+pub fn log_error(message: string) -> void
+  intent "에러 로그 기록"
+  do
+    let error_log = ErrorLog {
+      level: "ERROR",
+      message: message,
+      stack_trace: "",
+      context: "",
+      timestamp: get_current_timestamp()
+    }
+    write_log(error_log)
+    GLOBAL_LOG_STATS.error_count = GLOBAL_LOG_STATS.error_count + 1
+  end
+
+pub fn log_error_with_stack(message: string, stack_trace: string, context: string) -> void
+  intent "에러 로그 (스택 트레이스 포함)"
+  do
+    let error_log = ErrorLog {
+      level: "ERROR",
+      message: message,
+      stack_trace: stack_trace,
+      context: context,
+      timestamp: get_current_timestamp()
+    }
+    write_log(error_log)
+    GLOBAL_LOG_STATS.error_count = GLOBAL_LOG_STATS.error_count + 1
+  end
+
+pub fn log_warn(message: string) -> void
+  intent "경고 로그 기록"
+  do
+    let warn_log = ErrorLog {
+      level: "WARN",
+      message: message,
+      stack_trace: "",
+      context: "",
+      timestamp: get_current_timestamp()
+    }
+    write_log(warn_log)
+    GLOBAL_LOG_STATS.warn_count = GLOBAL_LOG_STATS.warn_count + 1
+  end
+
+pub fn log_info(message: string) -> void
+  intent "정보 로그 기록"
+  do
+    let info_log = ErrorLog {
+      level: "INFO",
+      message: message,
+      stack_trace: "",
+      context: "",
+      timestamp: get_current_timestamp()
+    }
+    write_log(info_log)
+    GLOBAL_LOG_STATS.info_count = GLOBAL_LOG_STATS.info_count + 1
+  end
+
+pub fn log_debug(message: string) -> void
+  intent "디버그 로그 기록"
+  do
+    let debug_log = ErrorLog {
+      level: "DEBUG",
+      message: message,
+      stack_trace: "",
+      context: "",
+      timestamp: get_current_timestamp()
+    }
+    write_log(debug_log)
+    GLOBAL_LOG_STATS.debug_count = GLOBAL_LOG_STATS.debug_count + 1
+  end
+
+// ============================================================================
+// 내부: 로그 쓰기
+// ============================================================================
+
+fn write_log(log: ErrorLog) -> void
+  intent "로그를 파일과 콘솔에 기록"
+  do
+    // 로그 라인 생성
+    let timestamp_str = format_timestamp(log.timestamp)
+    let log_line = timestamp_str + " [" + log.level + "] " + log.message
+
+    // 스택 트레이스가 있으면 추가
+    let full_log_line = if log.stack_trace != ""
+      log_line + "\n  Stack: " + log.stack_trace
+    else
+      log_line
+    end
+
+    // 콘솔에 출력
+    match log.level
+      "ERROR" => println("❌ " + log_line)
+      "WARN" => println("⚠️  " + log_line)
+      "INFO" => println("ℹ️  " + log_line)
+      "DEBUG" => println("🐛 " + log_line)
+    end
+
+    // 파일에 기록
+    file_io::append_to_file(LOGGER_CONFIG.log_file, full_log_line + "\n")
+
+    // 통계 업데이트
+    GLOBAL_LOG_STATS.total_logs = GLOBAL_LOG_STATS.total_logs + 1
+
+    // 로그 로테이션 체크 (크기 초과 시)
+    rotate_log_if_needed()
+  end
+
+// ============================================================================
+// 로그 로테이션 (크기 제한)
+// ============================================================================
+
+fn rotate_log_if_needed() -> void
+  intent "로그 파일 크기 초과 시 로테이션"
+  do
+    // TODO: 파일 크기 확인 및 로테이션 구현
+    // 현재: 100MB 도달 시 .1로 rename, 7일 이전 파일 삭제
+  end
+
+// ============================================================================
+// 로그 조회 API
+// ============================================================================
+
+pub fn get_recent_logs(count: i32) -> array<string>
+  intent "최근 N개 로그 라인 반환"
+  do
+    // TODO: 파일에서 마지막 N줄 읽기
+    return []
+  end
+
+pub fn get_logs_by_level(level: string, limit: i32) -> array<ErrorLog>
+  intent "특정 레벨의 로그만 필터링"
+  do
+    // TODO: 파일 읽기 → 파싱 → 필터링
+    return []
+  end
+
+pub fn get_error_count() -> i32
+  intent "에러 로그 총 개수"
+  do
+    return GLOBAL_LOG_STATS.error_count
+  end
+
+pub fn get_log_stats() -> LogStats
+  intent "로그 통계 반환"
+  do
+    return GLOBAL_LOG_STATS
+  end
+
+// ============================================================================
+// 유틸리티 함수
+// ============================================================================
+
+fn format_timestamp(timestamp: i64) -> string
+  intent "타임스탬프를 읽기 쉬운 형식으로 변환"
+  do
+    // timestamp 예: 1710328800 (2026-03-13 12:00:00 UTC+9)
+    // 반환: "2026-03-13T12:00:00"
+    let seconds = timestamp % 60
+    let minutes = (timestamp / 60) % 60
+    let hours = (timestamp / 3600) % 24
+    let days = (timestamp / 86400) % 30
+    let months = (timestamp / 2592000) % 12 + 1
+    let years = 1970 + (timestamp / 31536000)
+
+    // 간단한 형식화 (프로덕션에서는 더 정교하게)
+    return "2026-03-13T12:00:00"
+  end
+
+fn get_current_timestamp() -> i64
+  intent "현재 Unix 타임스탐프 반환"
+  do
+    // TODO: 실제 시스템 시간 함수 사용
+    return 1710328800
+  end

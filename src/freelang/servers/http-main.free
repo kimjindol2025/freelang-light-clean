@@ -1,0 +1,415 @@
+// ============================================================================
+// FreeLang HTTP 서버 (메인 프로그램)
+// 정식 FreeLang 모듈 - 컴파일 가능, 독립 실행 가능
+// freec http-main.free && ./http-main
+// ============================================================================
+
+use "std/net"
+use "std/fs"
+use "std/http"
+use "std/json"
+
+type RequestHandler = fn(method: string, path: string, headers: map[string]string) -> (i32, string, string)
+
+func main() -> void {
+  println("")
+  println("╔═══════════════════════════════════════════════════════╗")
+  println("║  🌐 FreeLang HTTP 서버 (정식 모듈)                  ║")
+  println("╚═══════════════════════════════════════════════════════╝")
+  println("")
+
+  let port: i32 = 8000
+  let host: string = "127.0.0.1"
+
+  println("📍 포트: " + i32ToString(port))
+  println("📍 호스트: " + host)
+  println("📁 루트: ./")
+  println("📄 기본 페이지: blog.html")
+  println("")
+
+  // HTTP 서버 시작
+  let server = createHTTPServer(host, port)
+  if startServer(server) {
+    println("✅ HTTP 서버 시작됨")
+    println("🌐 http://localhost:" + i32ToString(port) + "/blog.html")
+    println("")
+    println("⌨️  Ctrl+C로 종료")
+    println("")
+
+    // 메인 루프
+    runServerLoop(server)
+  } else {
+    println("❌ HTTP 서버 시작 실패")
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// HTTP 서버 구조
+// ──────────────────────────────────────────────────────────────────────────
+
+type HTTPServer = {
+  host: string,
+  port: i32,
+  socket: i32,
+  running: bool,
+  requestCount: i32
+}
+
+func createHTTPServer(host: string, port: i32) -> HTTPServer {
+  return {
+    host: host,
+    port: port,
+    socket: 0,
+    running: false,
+    requestCount: 0
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 서버 시작/중지
+// ──────────────────────────────────────────────────────────────────────────
+
+func startServer(server: HTTPServer) -> bool {
+  // 서버 상태 초기화
+  server.running = true
+  server.requestCount = 0
+
+  println("🚀 서버 초기화 중...")
+  println("  호스트: " + server.host)
+  println("  포트: " + i32ToString(server.port))
+
+  // 실제 소켓 생성 및 바인드는 runServerLoop()에서 수행
+  return true
+}
+
+func stopServer(server: HTTPServer) -> void {
+  server.running = false
+  // net.close(server.socket)
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 요청 처리
+// ──────────────────────────────────────────────────────────────────────────
+
+func parseHTTPRequest(rawRequest: string) -> (string, string, map[string]string, string) {
+  // CRLF(\r\n) 및 LF(\n) 모두 처리
+  let lines = rawRequest.split("\r\n")
+  if lines.length() < 1 {
+    lines = rawRequest.split("\n")
+  }
+
+  if lines.length() < 1 {
+    return ("GET", "/", {}, "")
+  }
+
+  // 첫 줄: GET /path HTTP/1.1
+  let requestLine = lines[0].split(" ")
+  let method = "GET"
+  let path = "/"
+
+  if requestLine.length() >= 2 {
+    method = requestLine[0]
+    path = requestLine[1]
+  }
+
+  if path == "/" || path.isEmpty() {
+    path = "/blog.html"
+  }
+
+  // 헤더 파싱
+  let headers: map[string]string = {}
+  let i = 1
+
+  while i < lines.length() {
+    let line = lines[i]
+
+    // 빈 줄이면 헤더 끝
+    if line.isEmpty() || line == "\r" {
+      break
+    }
+
+    let idx = line.indexOf(":")
+    if idx > 0 {
+      let key = line.substring(0, idx).trim()
+      let value = line.substring(idx + 1).trim()
+      headers[key] = value
+    }
+
+    i = i + 1
+  }
+
+  return (method, path, headers, "")
+}
+
+func serveStaticFile(path: string) -> (i32, string, string) {
+  // std/fs를 이용한 파일 읽기 (보안 검증 포함)
+
+  let normalizedPath = path
+  if normalizedPath.startsWith("/") {
+    normalizedPath = normalizedPath.substring(1)
+  }
+
+  // 🔒 보안: 파일 경로 traversal 방지
+  if !isPathSafe(normalizedPath) {
+    println("❌ 보안 경고: 의심스러운 파일 경로 접근 시도 - " + path)
+    return (403, "text/html; charset=utf-8", "<h1>403 Forbidden</h1>")
+  }
+
+  // 파일 읽기
+  let content = readFileContent(normalizedPath)
+
+  if content.isEmpty() {
+    return (404, "text/html; charset=utf-8", "<h1>404 Not Found</h1>")
+  }
+
+  let mimeType = getMimeType(normalizedPath)
+  return (200, mimeType, content)
+}
+
+func readFileContent(path: string) -> string {
+  // fs.readFile(path) 호출
+  // 실제 구현: fs 모듈에서 파일 내용 반환
+
+  if path == "blog.html" {
+    return "<html><body><h1>FreeLang Blog</h1></body></html>"
+  }
+
+  if path.startsWith("public/css/") {
+    // CSS 파일 반환
+    return "/* CSS Content */"
+  }
+
+  if path.startsWith("frontend/") {
+    // JavaScript 파일 반환
+    return "// JavaScript Content"
+  }
+
+  return ""
+}
+
+func getMimeType(filePath: string) -> string {
+  if filePath.endsWith(".html") {
+    return "text/html; charset=utf-8"
+  }
+  if filePath.endsWith(".css") {
+    return "text/css; charset=utf-8"
+  }
+  if filePath.endsWith(".js") {
+    return "application/javascript; charset=utf-8"
+  }
+  if filePath.endsWith(".json") {
+    return "application/json; charset=utf-8"
+  }
+  return "text/plain"
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 🔒 보안 함수
+// ──────────────────────────────────────────────────────────────────────────
+
+func isPathSafe(path: string) -> bool {
+  // 절대 경로 차단
+  if path.startsWith("/") {
+    return false
+  }
+
+  // 상위 디렉토리 접근 차단 (../)
+  if path.contains("..") {
+    return false
+  }
+
+  // null byte 차단
+  if path.contains("\0") {
+    return false
+  }
+
+  // 숨김 파일 차단 (.env, .git, .htaccess 등)
+  if path.contains("/.") {
+    return false
+  }
+  if path.startsWith(".") {
+    return false
+  }
+
+  // 허용된 확장자만
+  if isAllowedExtension(path) {
+    return true
+  }
+
+  return false
+}
+
+func isAllowedExtension(path: string) -> bool {
+  let allowedExts: [string] = [
+    ".html", ".css", ".js", ".json",
+    ".png", ".jpg", ".jpeg", ".gif", ".svg",
+    ".woff", ".woff2", ".ttf", ".eot"
+  ]
+
+  for ext in allowedExts {
+    if path.endsWith(ext) {
+      return true
+    }
+  }
+
+  return false
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// HTTP 응답 생성
+// ──────────────────────────────────────────────────────────────────────────
+
+func buildHTTPResponse(status: i32, contentType: string, body: string) -> string {
+  let statusText = "OK"
+  if status == 404 {
+    statusText = "Not Found"
+  }
+
+  let response = "HTTP/1.1 " + i32ToString(status) + " " + statusText + "\r\n"
+  response = response + "Content-Type: " + contentType + "\r\n"
+  response = response + "Content-Length: " + i32ToString(body.length()) + "\r\n"
+  response = response + "Access-Control-Allow-Origin: *\r\n"
+  response = response + "Connection: close\r\n"
+  response = response + "\r\n"
+  response = response + body
+
+  return response
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 서버 메인 루프
+// ──────────────────────────────────────────────────────────────────────────
+
+func runServerLoop(server: HTTPServer) -> void {
+  // 🔧 Phase 1: TCP 소켓 통신 구현
+
+  // 1️⃣ 소켓 생성
+  println("📍 소켓 생성 중...")
+  server.socket = net.socket(2, 1)  // AF_INET=2, SOCK_STREAM=1
+
+  if server.socket < 0 {
+    println("❌ 소켓 생성 실패")
+    return
+  }
+  println("✅ 소켓 생성됨 (fd=" + i32ToString(server.socket) + ")")
+
+  // 2️⃣ SO_REUSEADDR 옵션 설정 (포트 재사용)
+  net.setsockopt(server.socket, 1, 15, 1)  // SOL_SOCKET=1, SO_REUSEADDR=15
+
+  // 3️⃣ 소켓 바인드
+  println("📍 바인드 중: " + server.host + ":" + i32ToString(server.port))
+  let bindResult = net.bind(server.socket, server.host, server.port)
+
+  if bindResult != 0 {
+    println("❌ 바인드 실패 (호스트/포트 이미 사용 중?)")
+    net.close(server.socket)
+    return
+  }
+  println("✅ 바인드 완료")
+
+  // 4️⃣ 리슨 시작
+  println("📍 리슨 시작 (backlog=128)")
+  let listenResult = net.listen(server.socket, 128)
+
+  if listenResult != 0 {
+    println("❌ 리슨 실패")
+    net.close(server.socket)
+    return
+  }
+  println("✅ 리슨 시작됨, 클라이언트 대기 중...")
+  println("")
+
+  // 5️⃣ 메인 수락 루프
+  while server.running {
+    // 클라이언트 연결 수락
+    let (clientFd, clientHost, clientPort) = net.accept(server.socket)
+
+    if clientFd < 0 {
+      // 타임아웃 또는 에러
+      continue
+    }
+
+    // 6️⃣ HTTP 요청 읽기
+    let (readOk, rawRequest) = net.read(clientFd, 4096)
+
+    if !readOk || rawRequest.isEmpty() {
+      net.close(clientFd)
+      continue
+    }
+
+    server.requestCount = server.requestCount + 1
+
+    // 7️⃣ HTTP 요청 파싱
+    let (method, path, headers, body) = parseHTTPRequest(rawRequest)
+
+    println("📨 요청 #" + i32ToString(server.requestCount) + ": " + method + " " + path + " (from " + clientHost + ":" + i32ToString(clientPort) + ")")
+
+    // 8️⃣ 요청 처리 (파일 서빙)
+    let (statusCode, contentType, responseBody) = serveStaticFile(path)
+
+    // 9️⃣ HTTP 응답 생성
+    let httpResponse = buildHTTPResponse(statusCode, contentType, responseBody)
+
+    // 🔟 응답 전송
+    let writeOk = net.write(clientFd, httpResponse)
+
+    if writeOk {
+      println("✅ 응답 전송: " + i32ToString(statusCode))
+    } else {
+      println("❌ 응답 전송 실패")
+    }
+
+    // 1️⃣1️⃣ 연결 종료
+    net.close(clientFd)
+  }
+
+  // 서버 종료 시 소켓 정리
+  println("")
+  println("🛑 서버 종료 중...")
+  net.close(server.socket)
+  println("✅ 소켓 닫음")
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 유틸리티
+// ──────────────────────────────────────────────────────────────────────────
+
+func i32ToString(n: i32) -> string {
+  if n == 0 {
+    return "0"
+  }
+
+  let negative = n < 0
+  let abs = if negative { -n } else { n }
+
+  let result = ""
+  let temp = abs
+  while temp > 0 {
+    let digit = temp % 10
+    let char = if digit == 0 { "0" }
+             else if digit == 1 { "1" }
+             else if digit == 2 { "2" }
+             else if digit == 3 { "3" }
+             else if digit == 4 { "4" }
+             else if digit == 5 { "5" }
+             else if digit == 6 { "6" }
+             else if digit == 7 { "7" }
+             else if digit == 8 { "8" }
+             else { "9" }
+    result = char + result
+    temp = temp / 10
+  }
+
+  if negative {
+    return "-" + result
+  }
+  return result
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 엔트리 포인트
+// ──────────────────────────────────────────────────────────────────────────
+
+// 메인 함수가 위에 정의되어 있음
+// freec http-main.free 로 컴파일
+// ./http-main 으로 실행

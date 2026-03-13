@@ -1,0 +1,249 @@
+// ============================================================================
+// FreeLang Hybrid: Shared Types & Interfaces
+// 프론트엔드와 백엔드가 공유하는 타입 정의
+// ============================================================================
+
+// ──────────────────────────────────────────────────────────────────────────
+// Todo 도메인 타입
+// ──────────────────────────────────────────────────────────────────────────
+
+type Priority = enum {
+  LOW,
+  MEDIUM,
+  HIGH
+}
+
+type TodoStatus = enum {
+  PENDING,
+  DONE,
+  ARCHIVED
+}
+
+record Todo {
+  id: number
+  text: string
+  done: boolean
+  priority: Priority
+  tags: array<string>
+  createdAt: timestamp
+  updatedAt: timestamp
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Blog 도메인 타입
+// ──────────────────────────────────────────────────────────────────────────
+
+type BlogStatus = enum {
+  DRAFT,
+  PUBLISHED,
+  ARCHIVED
+}
+
+record Blog {
+  id: number
+  title: string
+  slug: string                // URL-friendly ID
+  content: string             // Markdown
+  summary: string
+  status: BlogStatus
+  author: string
+  category: string
+  tags: array<string>
+  viewCount: number
+  likeCount: number
+  createdAt: timestamp
+  updatedAt: timestamp
+  publishedAt: timestamp      // nullable
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Counter 도메인 타입
+// ──────────────────────────────────────────────────────────────────────────
+
+record Counter {
+  id: string
+  count: number
+  name: string
+  createdAt: timestamp
+  updatedAt: timestamp
+}
+
+record CounterHistory {
+  id: string
+  action: string
+  previousValue: number
+  newValue: number
+  timestamp: timestamp
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// API Response 타입 (프론트엔드 ↔ 백엔드 통신)
+// ──────────────────────────────────────────────────────────────────────────
+
+record ApiResponse<T> {
+  status: string        // "success" | "error"
+  statusCode: number    // 200, 201, 400, 404, 500
+  data: T              // 응답 데이터
+  message: string      // 에러 메시지 (선택)
+}
+
+record ApiError {
+  code: string         // "INVALID_INPUT", "NOT_FOUND", "SERVER_ERROR"
+  message: string
+  details: string      // 상세 정보
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// UI 상태 타입 (프론트엔드 전용)
+// ──────────────────────────────────────────────────────────────────────────
+
+type AsyncStatus = enum {
+  IDLE,
+  LOADING,
+  SUCCESS,
+  ERROR
+}
+
+record AsyncState<T> {
+  status: AsyncStatus
+  data: T              // nullable
+  error: string        // nullable
+  message: string      // nullable
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 검증 규칙 (양쪽에서 공유)
+// ──────────────────────────────────────────────────────────────────────────
+
+interface Validator {
+  validate(input: any) -> boolean
+  getErrors() -> array<string>
+}
+
+record ValidationRule {
+  field: string
+  rule: string
+  message: string
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 페이지네이션
+// ──────────────────────────────────────────────────────────────────────────
+
+record PaginationParams {
+  page: number         // 1부터 시작
+  limit: number        // 페이지당 항목 수
+  sort: string         // "createdAt" | "updatedAt"
+  order: string        // "asc" | "desc"
+}
+
+record PaginationResult<T> {
+  items: array<T>
+  total: number
+  page: number
+  limit: number
+  pages: number
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 필터 조건
+// ──────────────────────────────────────────────────────────────────────────
+
+record FilterCondition {
+  field: string
+  operator: string     // "eq", "ne", "gt", "lt", "regex", "in"
+  value: any
+}
+
+record QueryFilter {
+  conditions: array<FilterCondition>
+  pagination: PaginationParams
+  select: array<string>  // 선택할 필드 (nullable)
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 시스템 상태
+// ──────────────────────────────────────────────────────────────────────────
+
+record SystemHealth {
+  status: string       // "healthy" | "degraded" | "unhealthy"
+  uptime: number       // 초 단위
+  timestamp: timestamp
+  database: record {
+    todos: number
+    counters: number
+    healthy: boolean
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 이벤트 (상태 변경)
+// ──────────────────────────────────────────────────────────────────────────
+
+type EventType = enum {
+  COUNTER_INCREMENTED,
+  COUNTER_DECREMENTED,
+  COUNTER_RESET,
+  TODO_CREATED,
+  TODO_UPDATED,
+  TODO_DELETED,
+  TODO_TOGGLED,
+  BLOG_CREATED,
+  BLOG_UPDATED,
+  BLOG_DELETED,
+  BLOG_PUBLISHED
+}
+
+record StateEvent {
+  type: EventType
+  timestamp: timestamp
+  payload: any         // 이벤트별로 다른 데이터
+  metadata: record {
+    userId: string
+    source: string     // "frontend" | "backend"
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 액션 (상태 변경 요청)
+// ──────────────────────────────────────────────────────────────────────────
+
+type ActionType = enum {
+  INCREMENT_COUNTER,
+  DECREMENT_COUNTER,
+  RESET_COUNTER,
+  SET_COUNTER,
+  ADD_TODO,
+  UPDATE_TODO,
+  DELETE_TODO,
+  TOGGLE_TODO
+}
+
+record Action {
+  type: ActionType
+  payload: any
+  timestamp: timestamp
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 통계 (분석)
+// ──────────────────────────────────────────────────────────────────────────
+
+record TodoStats {
+  total: number
+  done: number
+  pending: number
+  byPriority: record {
+    high: number
+    medium: number
+    low: number
+  }
+  byTag: map<string, number>
+}
+
+record PerformanceMetrics {
+  responseTime: number      // ms
+  memoryUsage: number       // bytes
+  requestsPerSecond: number
+  errorRate: number         // percentage
+}

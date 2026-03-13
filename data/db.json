@@ -1,0 +1,71 @@
+{
+  "counter": {
+    "id": "main",
+    "count": 0,
+    "name": "Main Counter",
+    "createdAt": "2026-03-12T00:00:00Z",
+    "updatedAt": "2026-03-12T00:00:00Z"
+  },
+  "blogs": [
+    {
+      "id": 1,
+      "title": "FreeLang HTTP Server 완성",
+      "slug": "freelang-http-server",
+      "content": "순수 FreeLang으로 완전한 HTTP/1.1 서버를 구현했습니다. TCP 소켓 관리부터 REST API 라우팅까지 모든 것이 FreeLang으로만 이루어져 있습니다.",
+      "summary": "Node.js 없이 FreeLang만으로 완벽한 HTTP 서버를 구현",
+      "status": "PUBLISHED",
+      "author": "FreeLang Team",
+      "category": "Technology",
+      "tags": ["freelang", "http", "server"],
+      "viewCount": 0,
+      "likeCount": 0,
+      "createdAt": "2026-03-12T08:00:00Z",
+      "updatedAt": "2026-03-12T08:00:00Z",
+      "publishedAt": "2026-03-12T08:00:00Z"
+    },
+    {
+      "id": 2,
+      "title": "FreeLang의 메모리 관리 시스템",
+      "slug": "freelang-memory-management",
+      "content": "FreeLang은 효율적인 메모리 관리를 위해 다양한 최적화 기법을 사용합니다. 스택 기반 할당부터 가비지 컬렉션까지 자세히 살펴봅시다.",
+      "summary": "FreeLang 메모리 관리 내부 구조 완전 분석",
+      "status": "PUBLISHED",
+      "author": "FreeLang Team",
+      "category": "Performance",
+      "tags": ["memory", "gc", "optimization"],
+      "viewCount": 0,
+      "likeCount": 0,
+      "createdAt": "2026-03-12T09:30:00Z",
+      "updatedAt": "2026-03-12T09:30:00Z",
+      "publishedAt": "2026-03-12T09:30:00Z"
+    },
+    {
+      "id": 3,
+      "title": "Type Safety와 패턴 매칭",
+      "slug": "type-safety-pattern-matching",
+      "content": "FreeLang의 강력한 타입 시스템과 패턴 매칭 기능이 어떻게 버그를 줄이고 코드를 더 명확하게 만드는지 알아봅시다.",
+      "summary": "FreeLang의 타입 시스템 심화 가이드",
+      "status": "DRAFT",
+      "author": "FreeLang Team",
+      "category": "Programming",
+      "tags": ["types", "pattern-matching", "best-practices"],
+      "viewCount": 0,
+      "likeCount": 0,
+      "createdAt": "2026-03-12T10:15:00Z",
+      "updatedAt": "2026-03-12T10:15:00Z",
+      "publishedAt": null
+    }
+  ],
+  "todos": [
+    {
+      "id": 1,
+      "text": "FreeLang 컴파일러 성능 최적화",
+      "done": false,
+      "priority": "HIGH",
+      "tags": ["compiler", "optimization"],
+      "createdAt": "2026-03-12T00:00:00Z",
+      "updatedAt": "2026-03-12T00:00:00Z"
+    }
+  ],
+  "events": []
+}

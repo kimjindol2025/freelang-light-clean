@@ -1,0 +1,231 @@
+// ============================================================================
+// FreeLang State: 상태 관리 (Counter, Todo, Blog)
+// ============================================================================
+
+use "types"
+
+// ──────────────────────────────────────────────────────────────────────────
+// 글로벌 상태
+// ──────────────────────────────────────────────────────────────────────────
+
+var counter: Counter = {
+  id: "main",
+  count: 0,
+  name: "Main Counter",
+  createdAt: "2026-03-12T00:00:00Z",
+  updatedAt: "2026-03-12T00:00:00Z"
+}
+
+var todos: array<Todo> = []
+var blogs: array<Blog> = []
+var nextBlogId: number = 1
+
+// ──────────────────────────────────────────────────────────────────────────
+// Counter 함수
+// ──────────────────────────────────────────────────────────────────────────
+
+func getCounter() -> Counter {
+  return counter
+}
+
+func incrementCounter() -> Counter {
+  counter.count = counter.count + 1
+  counter.updatedAt = getCurrentTime()
+  return counter
+}
+
+func decrementCounter() -> Counter {
+  counter.count = counter.count - 1
+  counter.updatedAt = getCurrentTime()
+  return counter
+}
+
+func resetCounter() -> Counter {
+  counter.count = 0
+  counter.updatedAt = getCurrentTime()
+  return counter
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Blog 함수
+// ──────────────────────────────────────────────────────────────────────────
+
+func createBlog(
+  title: string,
+  slug: string,
+  content: string,
+  summary: string,
+  author: string,
+  category: string,
+  tags: array<string>
+) -> Blog {
+  let blog: Blog = {
+    id: nextBlogId,
+    title: title,
+    slug: slug,
+    content: content,
+    summary: summary,
+    status: BlogStatus.DRAFT,
+    author: author,
+    category: category,
+    tags: tags,
+    viewCount: 0,
+    likeCount: 0,
+    createdAt: getCurrentTime(),
+    updatedAt: getCurrentTime(),
+    publishedAt: null
+  }
+
+  blogs.push(blog)
+  nextBlogId = nextBlogId + 1
+
+  return blog
+}
+
+func getBlogs(status: BlogStatus) -> array<Blog> {
+  var result: array<Blog> = []
+
+  for blog in blogs {
+    if blog.status == status {
+      result.push(blog)
+    }
+  }
+
+  return result
+}
+
+func getBlogById(id: number) -> Blog? {
+  for blog in blogs {
+    if blog.id == id {
+      return blog
+    }
+  }
+  return null
+}
+
+func getBlogBySlug(slug: string) -> Blog? {
+  for blog in blogs {
+    if blog.slug == slug {
+      return blog
+    }
+  }
+  return null
+}
+
+func updateBlog(
+  id: number,
+  title: string,
+  content: string,
+  summary: string,
+  category: string,
+  tags: array<string>
+) -> Blog? {
+  for i = 0; i < blogs.length; i = i + 1 {
+    if blogs[i].id == id {
+      blogs[i].title = title
+      blogs[i].content = content
+      blogs[i].summary = summary
+      blogs[i].category = category
+      blogs[i].tags = tags
+      blogs[i].updatedAt = getCurrentTime()
+      return blogs[i]
+    }
+  }
+  return null
+}
+
+func publishBlog(id: number) -> Blog? {
+  for i = 0; i < blogs.length; i = i + 1 {
+    if blogs[i].id == id {
+      blogs[i].status = BlogStatus.PUBLISHED
+      blogs[i].publishedAt = getCurrentTime()
+      blogs[i].updatedAt = getCurrentTime()
+      return blogs[i]
+    }
+  }
+  return null
+}
+
+func deleteBlog(id: number) -> bool {
+  for i = 0; i < blogs.length; i = i + 1 {
+    if blogs[i].id == id {
+      blogs.remove(i)
+      return true
+    }
+  }
+  return false
+}
+
+func incrementBlogView(id: number) -> bool {
+  for i = 0; i < blogs.length; i = i + 1 {
+    if blogs[i].id == id {
+      blogs[i].viewCount = blogs[i].viewCount + 1
+      return true
+    }
+  }
+  return false
+}
+
+func likeBlog(id: number) -> number? {
+  for i = 0; i < blogs.length; i = i + 1 {
+    if blogs[i].id == id {
+      blogs[i].likeCount = blogs[i].likeCount + 1
+      return blogs[i].likeCount
+    }
+  }
+  return null
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Todo 함수
+// ──────────────────────────────────────────────────────────────────────────
+
+func getTodos() -> array<Todo> {
+  return todos
+}
+
+func addTodo(text: string) -> Todo {
+  let todo: Todo = {
+    id: todos.length + 1,
+    text: text,
+    done: false,
+    priority: Priority.MEDIUM,
+    tags: [],
+    createdAt: getCurrentTime(),
+    updatedAt: getCurrentTime()
+  }
+  todos.push(todo)
+  return todo
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 유틸리티
+// ──────────────────────────────────────────────────────────────────────────
+
+func getCurrentTime() -> string {
+  return "2026-03-12T00:00:00Z"
+}
+
+func getSystemHealth() -> any {
+  return { status: "healthy" }
+}
+
+func loadFromDatabase() {
+  // DB 로드
+}
+
+func persistDatabase() {
+  // DB 저장
+}
+
+func clearHistory() {
+  // 이력 초기화
+}
+
+export {
+  getCounter, incrementCounter, decrementCounter, resetCounter,
+  createBlog, getBlogs, getBlogById, getBlogBySlug, updateBlog, publishBlog, deleteBlog, incrementBlogView, likeBlog,
+  getTodos, addTodo,
+  getCurrentTime, getSystemHealth,
+  loadFromDatabase, persistDatabase, clearHistory
+}

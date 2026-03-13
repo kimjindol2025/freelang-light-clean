@@ -1,0 +1,81 @@
+# Build & Dependencies
+node_modules/
+dist/
+build/
+*.o
+*.a
+.npm/
+.npm-global/
+
+# Test Files (루트의 test-*.* 파일들)
+test-*.js
+test-*.ts
+test-*.free
+test-*.fl
+test-*.v5
+test_*.ts
+test_*.free
+test.free
+test1.db
+test2.db
+test_fixed.db
+test_simple.db
+test_v2.db
+test.db
+*.db
+
+# Logs & Reports
+logs/
+*.log
+.npm/_logs/
+EVOLUTION_LOG.json
+REAL_EVOLUTION_REPORT.json
+SESSION_FINAL_SUMMARY.txt
+SELF_EVOLUTION_REPORT.json
+SECURITY_PATCH_REPORT.txt
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Environment & Credentials
+.env
+.env.local
+.env.*.local
+.git-credentials
+.ssh/
+.claude/.credentials.json
+
+# Temporary
+.tmp/
+temp/
+*.temp
+.backups/
+.patch_backups/
+.freelang-ai-out/
+
+# Coverage
+coverage/
+*.lcov
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Generated Files (but keep some)
+*.c
+!stdlib/ffi/*.c
+!stdlib/core/*.c
+!stdlib/**/*.c
+
+*.h
+!stdlib/ffi/*.h
+!stdlib/core/*.h
+!stdlib/**/*.h
