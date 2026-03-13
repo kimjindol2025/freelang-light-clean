@@ -131,7 +131,8 @@ pub fn main() -> void {
     print("")
 
     // HTTP 엔진 시작 ✅ (HTTP Engine 통합)
-    match http_server_main("127.0.0.1", 5021, handle_http_request)
+    // 0.0.0.0에 바인딩: nginx reverse proxy를 통한 외부 접근 허용
+    match http_server_main("0.0.0.0", 5021, handle_http_request)
       Ok(()) => {
         print("✨ Server ready!")
       }

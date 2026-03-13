@@ -127,9 +127,7 @@ services:
       retries: 3
       start_period: 10s
 
-    # 프로필 (필요시만 실행)
-    profiles:
-      - nginx
+    # 주석: profiles 제거 → nginx 항상 활성화 (프로덕션 필수)
 
   # ==================== PostgreSQL Database (선택사항) ====================
   postgres:
