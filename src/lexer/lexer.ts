@@ -275,6 +275,17 @@ export class Lexer {
   }
 
   /**
+   * Phase 10: Check if TokenType is a design directive
+   */
+  private isDesignDirective(type: TokenType): boolean {
+    return type === TokenType.ANIMATION_DESIGN ||
+           type === TokenType.GLASS_DESIGN ||
+           type === TokenType.TRANSFORM3D_DESIGN ||
+           type === TokenType.MICRO_DESIGN ||
+           type === TokenType.SCROLL_DESIGN;
+  }
+
+  /**
    * Create token and track last token type
    */
   private makeToken(type: TokenType, value: string): Token {
@@ -496,7 +507,34 @@ export class Lexer {
       case ',': return this.makeToken(TokenType.COMMA, ',');
       case ';': return this.makeToken(TokenType.SEMICOLON, ';');
       case ':': return this.makeToken(TokenType.COLON, ':');
-      case '@': return this.makeToken(TokenType.AT, '@');
+      case '@': {
+        // Phase 10: Lookahead for design directives (@animation, @glass, @3d, @micro, @scroll)
+        if (this.isLetter(this.current)) {
+          // Save position to potentially rollback
+          const savedPos = this.position;
+          const savedLine = this.line;
+          const savedCol = this.column;
+
+          // Try reading the identifier
+          const identifier = this.readIdentifier();
+          const keywordType = getKeyword(identifier);
+
+          // Check if it's a design directive
+          if (this.isDesignDirective(keywordType)) {
+            // Emit design directive token with full @identifier
+            return this.makeToken(keywordType, '@' + identifier);
+          }
+
+          // Not a design directive - reset and return @ token only
+          // Next nextToken() call will tokenize the identifier
+          this.position = savedPos;
+          this.line = savedLine;
+          this.column = savedCol;
+          this.current = this.input[this.position - 1] || '\0';
+        }
+
+        return this.makeToken(TokenType.AT, '@');
+      }
       case '#': return this.makeToken(TokenType.HASH, '#');
       default:
         return this.makeToken(TokenType.ILLEGAL, ch);

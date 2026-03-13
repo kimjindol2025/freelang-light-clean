@@ -136,7 +136,14 @@ export enum TokenType {
   MUTATION = 'MUTATION', // mutation 타입 정의
 
   // Self-Formatting Compiler: 포맷 정책 어노테이션
-  FORMAT_POLICY = 'FORMAT_POLICY'  // @format(indent:4, semi:true, ...) 어노테이션
+  FORMAT_POLICY = 'FORMAT_POLICY',  // @format(indent:4, semi:true, ...) 어노테이션
+
+  // Phase 10: Design Compiler Integration (5개 디자인 디렉티브)
+  ANIMATION_DESIGN = 'ANIMATION_DESIGN',   // @animation (CSS keyframes)
+  GLASS_DESIGN = 'GLASS_DESIGN',           // @glass (Glassmorphism)
+  TRANSFORM3D_DESIGN = 'TRANSFORM3D_DESIGN', // @3d (3D transforms)
+  MICRO_DESIGN = 'MICRO_DESIGN',           // @micro (Micro-interactions)
+  SCROLL_DESIGN = 'SCROLL_DESIGN'          // @scroll (Scroll triggers)
 }
 
 /**
@@ -214,7 +221,14 @@ export const KEYWORDS: Record<string, TokenType> = {
   'schema': TokenType.SCHEMA,
   'resolver': TokenType.RESOLVER,
   'query': TokenType.QUERY,
-  'mutation': TokenType.MUTATION
+  'mutation': TokenType.MUTATION,
+
+  // Phase 10: Design Directive Keywords (@ 다음에 오는 키워드들)
+  'animation': TokenType.ANIMATION_DESIGN,
+  'glass': TokenType.GLASS_DESIGN,
+  '3d': TokenType.TRANSFORM3D_DESIGN,
+  'micro': TokenType.MICRO_DESIGN,
+  'scroll': TokenType.SCROLL_DESIGN
 };
 
 /**
