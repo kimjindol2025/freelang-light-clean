@@ -155,10 +155,30 @@ func handleAPIRequest(server: APIServer, path: string, query: map[string]string)
     }
   }
 
-  // GET /api/posts/:id - 블로그 상세
+  // GET /api/posts/:id - 블로그 상세 (🔒 ID 검증 추가)
   if path.startsWith("/api/posts/") {
     let idStr = path.substring(11)
+
+    // 🔒 보안: ID 검증
+    if !isValidBlogId(idStr) {
+      return {
+        status: 400,
+        contentType: "application/json; charset=utf-8",
+        body: "{\"error\": \"Invalid blog ID\", \"message\": \"Blog ID must be numeric\"}"
+      }
+    }
+
     let id = stringToI32(idStr)
+
+    // 🔒 보안: ID 범위 확인 (1-1000)
+    if id < 1 || id > 1000 {
+      return {
+        status: 400,
+        contentType: "application/json; charset=utf-8",
+        body: "{\"error\": \"Invalid blog ID\", \"message\": \"Blog ID out of range\"}"
+      }
+    }
+
     let blog = getBlogById(server.blogs, id)
 
     let json = blogToJSON(blog)
@@ -185,7 +205,7 @@ func handleAPIRequest(server: APIServer, path: string, query: map[string]string)
     }
   }
 
-  // GET /api/health - 상태 확인
+  // GET /api/health - 상태 확인 (인증 불필요)
   if path == "/api/health" {
     let json = "{"
     json = json + "\"status\": \"ok\", "
@@ -197,6 +217,17 @@ func handleAPIRequest(server: APIServer, path: string, query: map[string]string)
       status: 200,
       contentType: "application/json; charset=utf-8",
       body: json
+    }
+  }
+
+  // POST /api/posts - 새 블로그 생성 (🔒 인증 필요)
+  if path == "/api/posts" {
+    // 🔒 보안: 이 엔드포인트는 인증이 필요하다고 표시
+    // 실제 구현 시 헤더에서 Authorization 토큰 확인
+    return {
+      status: 401,
+      contentType: "application/json; charset=utf-8",
+      body: "{\"error\": \"Unauthorized\", \"message\": \"Authorization header required\"}"
     }
   }
 
@@ -346,4 +377,75 @@ func boolToString(b: bool) -> string {
     return "true"
   }
   return "false"
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 🔒 보안 검증 함수
+// ──────────────────────────────────────────────────────────────────────────
+
+func isValidBlogId(idStr: string) -> bool {
+  // ID는 숫자만 허용, 길이 1-10자
+  if idStr.isEmpty() || idStr.length() > 10 {
+    return false
+  }
+
+  // 모든 문자가 숫자인지 확인
+  for i in 0..idStr.length() {
+    let char = idStr[i]
+    if !isDigitChar(char) {
+      return false
+    }
+  }
+
+  return true
+}
+
+func isDigitChar(char: string) -> bool {
+  // 문자가 숫자인지 확인
+  if char == "0" || char == "1" || char == "2" || char == "3" || char == "4" {
+    return true
+  }
+  if char == "5" || char == "6" || char == "7" || char == "8" || char == "9" {
+    return true
+  }
+  return false
+}
+
+func isValidQueryParam(paramName: string, paramValue: string) -> bool {
+  // 쿼리 파라미터 검증
+
+  // 파라미터 이름 검증
+  if paramName.isEmpty() || paramName.length() > 50 {
+    return false
+  }
+
+  // 파라미터 값 검증
+  if paramValue.isEmpty() || paramValue.length() > 256 {
+    return false
+  }
+
+  // XSS 패턴 차단
+  if paramValue.contains("<") || paramValue.contains(">") {
+    return false
+  }
+
+  // SQL injection 패턴 차단
+  if paramValue.contains("'") || paramValue.contains("\"") || paramValue.contains(";") {
+    return false
+  }
+
+  return true
+}
+
+func isSecureQueryString(query: map[string]string) -> bool {
+  // 전체 쿼리 문자열 검증
+
+  for key in query {
+    let value = query[key]
+    if !isValidQueryParam(key, value) {
+      return false
+    }
+  }
+
+  return true
 }

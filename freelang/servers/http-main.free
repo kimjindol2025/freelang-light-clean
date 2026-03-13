@@ -119,10 +119,17 @@ func parseHTTPRequest(rawRequest: string) -> (string, string, map[string]string,
 }
 
 func serveStaticFile(path: string) -> (i32, string, string) {
-  // std/fs를 이용한 파일 읽기
+  // std/fs를 이용한 파일 읽기 (보안 검증 포함)
+
   let normalizedPath = path
   if normalizedPath.startsWith("/") {
     normalizedPath = normalizedPath.substring(1)
+  }
+
+  // 🔒 보안: 파일 경로 traversal 방지
+  if !isPathSafe(normalizedPath) {
+    println("❌ 보안 경고: 의심스러운 파일 경로 접근 시도 - " + path)
+    return (403, "text/html; charset=utf-8", "<h1>403 Forbidden</h1>")
   }
 
   // 파일 읽기
@@ -171,6 +178,58 @@ func getMimeType(filePath: string) -> string {
     return "application/json; charset=utf-8"
   }
   return "text/plain"
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 🔒 보안 함수
+// ──────────────────────────────────────────────────────────────────────────
+
+func isPathSafe(path: string) -> bool {
+  // 절대 경로 차단
+  if path.startsWith("/") {
+    return false
+  }
+
+  // 상위 디렉토리 접근 차단 (../)
+  if path.contains("..") {
+    return false
+  }
+
+  // null byte 차단
+  if path.contains("\0") {
+    return false
+  }
+
+  // 숨김 파일 차단 (.env, .git, .htaccess 등)
+  if path.contains("/.") {
+    return false
+  }
+  if path.startsWith(".") {
+    return false
+  }
+
+  // 허용된 확장자만
+  if isAllowedExtension(path) {
+    return true
+  }
+
+  return false
+}
+
+func isAllowedExtension(path: string) -> bool {
+  let allowedExts: [string] = [
+    ".html", ".css", ".js", ".json",
+    ".png", ".jpg", ".jpeg", ".gif", ".svg",
+    ".woff", ".woff2", ".ttf", ".eot"
+  ]
+
+  for ext in allowedExts {
+    if path.endsWith(ext) {
+      return true
+    }
+  }
+
+  return false
 }
 
 // ──────────────────────────────────────────────────────────────────────────

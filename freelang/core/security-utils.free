@@ -1,0 +1,458 @@
+// ============================================================================
+// FreeLang 보안 유틸리티 모듈
+// 파일 경로 검증, URL 파라미터 검증, API 인증
+// ============================================================================
+
+// ──────────────────────────────────────────────────────────────────────────
+// 1. 파일 경로 Traversal 방지
+// ──────────────────────────────────────────────────────────────────────────
+
+func validateFilePath(path: string, basePath: string) -> bool {
+  // 경로 정규화: ../../../ 같은 패턴 제거
+  let cleanPath = path
+
+  // 절대 경로 차단
+  if cleanPath.startsWith("/") {
+    return false
+  }
+
+  // 상위 디렉토리 접근 차단
+  if cleanPath.contains("..") {
+    return false
+  }
+
+  // null byte 차단 (C 스타일 문자열 공격)
+  if cleanPath.contains("\0") {
+    return false
+  }
+
+  // 허용된 파일만
+  if !isAllowedFile(cleanPath) {
+    return false
+  }
+
+  return true
+}
+
+func normalizePath(path: string) -> string {
+  let result = path
+
+  // 앞의 슬래시 제거
+  if result.startsWith("/") {
+    result = result.substring(1)
+  }
+
+  // 뒤의 슬래시 제거
+  if result.endsWith("/") {
+    result = result.substring(0, result.length() - 1)
+  }
+
+  // 연속된 슬래시 단일화
+  // "/" 반복 제거 (간단한 구현)
+  let normalized = ""
+  let i = 0
+  while i < result.length() {
+    let char = result[i]
+    if char == "/" {
+      // 이전 문자도 "/"인지 확인
+      if i > 0 {
+        let prevChar = result[i - 1]
+        if prevChar == "/" {
+          // 건너뛰기
+          i = i + 1
+          continue
+        }
+      }
+    }
+    normalized = normalized + char
+    i = i + 1
+  }
+
+  return normalized
+}
+
+func isAllowedFile(path: string) -> bool {
+  // 화이트리스트 기반 파일 접근 제어
+  let whitelist: [string] = [
+    "blog.html",
+    "public/css/styles.css",
+    "public/css/styles-dark.css",
+    "frontend/tailwind-runtime.js",
+    "index.html",
+    "api/posts.json"
+  ]
+
+  for allowed in whitelist {
+    if path == allowed {
+      return true
+    }
+  }
+
+  // public/ 디렉토리는 일부 허용
+  if path.startsWith("public/") {
+    return true
+  }
+
+  // frontend/ 디렉토리는 일부 허용
+  if path.startsWith("frontend/") {
+    return true
+  }
+
+  return false
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 2. URL 파라미터 검증
+// ──────────────────────────────────────────────────────────────────────────
+
+func validateURLParameter(param: string, paramType: string) -> bool {
+  // 파라미터 타입별 검증
+
+  if paramType == "id" {
+    return isValidId(param)
+  }
+
+  if paramType == "string" {
+    return isValidString(param)
+  }
+
+  if paramType == "boolean" {
+    return isValidBoolean(param)
+  }
+
+  if paramType == "email" {
+    return isValidEmail(param)
+  }
+
+  return false
+}
+
+func isValidId(id: string) -> bool {
+  // ID는 숫자만 허용
+  if id.isEmpty() {
+    return false
+  }
+
+  // 길이 제한 (최대 10자)
+  if id.length() > 10 {
+    return false
+  }
+
+  // 모든 문자가 숫자인지 확인
+  for i in 0..id.length() {
+    let char = id[i]
+    if !isDigit(char) {
+      return false
+    }
+  }
+
+  return true
+}
+
+func isValidString(str: string) -> bool {
+  // 문자열은 최대 256자
+  if str.isEmpty() || str.length() > 256 {
+    return false
+  }
+
+  // 특수문자 제한 (XSS 방지)
+  if str.contains("<") || str.contains(">") || str.contains("\"") {
+    return false
+  }
+
+  // SQL injection 패턴 제거
+  if str.contains("'") || str.contains("--") || str.contains(";") {
+    return false
+  }
+
+  return true
+}
+
+func isValidBoolean(value: string) -> bool {
+  // "true" 또는 "false" 또는 "1" 또는 "0" 만 허용
+  if value == "true" || value == "false" || value == "1" || value == "0" {
+    return true
+  }
+  return false
+}
+
+func isValidEmail(email: string) -> bool {
+  // 기본 이메일 검증 (간단한 버전)
+  if email.isEmpty() || email.length() > 254 {
+    return false
+  }
+
+  // @ 포함 확인
+  let atCount = 0
+  for i in 0..email.length() {
+    if email[i] == "@" {
+      atCount = atCount + 1
+    }
+  }
+
+  if atCount != 1 {
+    return false
+  }
+
+  // @ 위치 확인 (시작/끝 제외)
+  let atIndex = email.indexOf("@")
+  if atIndex <= 0 || atIndex >= email.length() - 1 {
+    return false
+  }
+
+  // 도메인에 . 포함 확인
+  let afterAt = email.substring(atIndex + 1)
+  if !afterAt.contains(".") {
+    return false
+  }
+
+  return true
+}
+
+func isDigit(char: string) -> bool {
+  if char == "0" || char == "1" || char == "2" || char == "3" || char == "4" {
+    return true
+  }
+  if char == "5" || char == "6" || char == "7" || char == "8" || char == "9" {
+    return true
+  }
+  return false
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 3. API 인증 (토큰 기반)
+// ──────────────────────────────────────────────────────────────────────────
+
+type APIToken = {
+  value: string,
+  expires: i32,
+  scope: string
+}
+
+func generateToken(userId: string) -> string {
+  // 간단한 토큰 생성 (실제로는 JWT 사용)
+  // 형식: "token_" + userId + "_" + timestamp
+
+  let token = "token_" + userId + "_" + i32ToString(getCurrentTimestamp())
+  return token
+}
+
+func validateToken(token: string, requiredScope: string) -> bool {
+  // 토큰 형식 확인
+  if !token.startsWith("token_") {
+    return false
+  }
+
+  // 토큰 길이 제한
+  if token.length() > 100 {
+    return false
+  }
+
+  // 실제로는 데이터베이스에서 토큰 확인
+  // 현재는 형식만 검증
+
+  return true
+}
+
+func extractTokenFromHeader(header: string) -> string {
+  // "Bearer <token>" 형식에서 토큰 추출
+
+  if !header.startsWith("Bearer ") {
+    return ""
+  }
+
+  let token = header.substring(7)
+  return token
+}
+
+func requireAuth(headers: map[string]string, requiredScope: string) -> (bool, string) {
+  // Authorization 헤더 확인
+  let authHeader = headers["Authorization"]
+
+  if authHeader.isEmpty() {
+    return (false, "Missing Authorization header")
+  }
+
+  // 토큰 추출 및 검증
+  let token = extractTokenFromHeader(authHeader)
+
+  if token.isEmpty() {
+    return (false, "Invalid Authorization format")
+  }
+
+  if !validateToken(token, requiredScope) {
+    return (false, "Invalid or expired token")
+  }
+
+  return (true, "OK")
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 4. Rate Limiting (기본)
+// ──────────────────────────────────────────────────────────────────────────
+
+type RateLimitConfig = {
+  maxRequests: i32,
+  timeWindowSeconds: i32
+}
+
+type RateLimitEntry = {
+  ip: string,
+  requestCount: i32,
+  firstRequestTime: i32
+}
+
+type RateLimiter = {
+  config: RateLimitConfig,
+  entries: [RateLimitEntry]
+}
+
+func createRateLimiter(maxRequests: i32, timeWindowSeconds: i32) -> RateLimiter {
+  return {
+    config: {
+      maxRequests: maxRequests,
+      timeWindowSeconds: timeWindowSeconds
+    },
+    entries: []
+  }
+}
+
+func checkRateLimit(limiter: RateLimiter, ip: string) -> bool {
+  let now = getCurrentTimestamp()
+  let timeWindow = limiter.config.timeWindowSeconds
+
+  // 해당 IP의 항목 찾기
+  for i in 0..limiter.entries.length() {
+    let entry = limiter.entries[i]
+
+    if entry.ip == ip {
+      // 시간 윈도우 초과 확인
+      let elapsedTime = now - entry.firstRequestTime
+
+      if elapsedTime > timeWindow {
+        // 시간 윈도우 만료 - 리셋
+        limiter.entries[i].requestCount = 1
+        limiter.entries[i].firstRequestTime = now
+        return true
+      }
+
+      // 요청 수 확인
+      if entry.requestCount >= limiter.config.maxRequests {
+        return false
+      }
+
+      // 요청 수 증가
+      limiter.entries[i].requestCount = entry.requestCount + 1
+      return true
+    }
+  }
+
+  // 새로운 IP 항목 추가
+  limiter.entries.push({
+    ip: ip,
+    requestCount: 1,
+    firstRequestTime: now
+  })
+
+  return true
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 5. 보안 헤더 추가
+// ──────────────────────────────────────────────────────────────────────────
+
+func getSecurityHeaders() -> map[string]string {
+  let headers: map[string]string = {}
+
+  // XSS 방지
+  headers["X-Content-Type-Options"] = "nosniff"
+  headers["X-Frame-Options"] = "DENY"
+  headers["X-XSS-Protection"] = "1; mode=block"
+
+  // CSRF 방지
+  headers["X-CSRF-Token"] = generateCSRFToken()
+
+  // Content Security Policy
+  headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
+
+  // 기타 보안 헤더
+  headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+  headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+  headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+
+  return headers
+}
+
+func generateCSRFToken() -> string {
+  // CSRF 토큰 생성 (간단한 버전)
+  let token = "csrf_" + i32ToString(getCurrentTimestamp())
+  return token
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 6. HTTPS/TLS 설정 (std/net 지원 필요)
+// ──────────────────────────────────────────────────────────────────────────
+
+type TLSConfig = {
+  enabled: bool,
+  certFile: string,
+  keyFile: string,
+  minVersion: string,
+  ciphers: [string]
+}
+
+func createTLSConfig(certFile: string, keyFile: string) -> TLSConfig {
+  return {
+    enabled: true,
+    certFile: certFile,
+    keyFile: keyFile,
+    minVersion: "1.2",
+    ciphers: [
+      "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
+      "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305",
+      "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384"
+    ]
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 7. 유틸리티 함수
+// ──────────────────────────────────────────────────────────────────────────
+
+func getCurrentTimestamp() -> i32 {
+  // 현재 타임스탐프 반환 (초 단위)
+  // 실제 구현: std/time.now()
+  return 0
+}
+
+func i32ToString(n: i32) -> string {
+  if n == 0 {
+    return "0"
+  }
+
+  let negative = n < 0
+  let abs = if negative { -n } else { n }
+
+  let result = ""
+  let temp = abs
+  while temp > 0 {
+    let digit = temp % 10
+    let char = if digit == 0 { "0" }
+             else if digit == 1 { "1" }
+             else if digit == 2 { "2" }
+             else if digit == 3 { "3" }
+             else if digit == 4 { "4" }
+             else if digit == 5 { "5" }
+             else if digit == 6 { "6" }
+             else if digit == 7 { "7" }
+             else if digit == 8 { "8" }
+             else { "9" }
+    result = char + result
+    temp = temp / 10
+  }
+
+  if negative {
+    return "-" + result
+  }
+  return result
+}
