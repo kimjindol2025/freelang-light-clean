@@ -1,0 +1,111 @@
+# ============================================================================
+# Prometheus Configuration for FreeLang Blog Monitoring
+# ============================================================================
+# 용도: 시스템 메트릭 수집, 성능 모니터링, 경고
+# 접근: http://localhost:9090 (웹 UI)
+
+global:
+  # 메트릭 수집 주기
+  scrape_interval: 15s
+
+  # 메트릭 평가 주기
+  evaluation_interval: 15s
+
+  # 외부 URL (알림에서 사용)
+  external_labels:
+    monitor: 'freelang-blog'
+    environment: 'production'
+
+# ============================================================================
+# 경고 규칙
+# ============================================================================
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+          # - 'alertmanager:9093'
+
+# 규칙 파일 로드
+rule_files:
+  - 'alerting-rules.yml'
+  - 'recording-rules.yml'
+
+# ============================================================================
+# 스크래이프 설정 (메트릭 수집)
+# ============================================================================
+
+scrape_configs:
+  # 1. Prometheus 자신 모니터링
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # 2. FreeLang Blog 서버 메트릭
+  - job_name: 'freelang-blog'
+    metrics_path: '/api/metrics'
+    scrape_interval: 10s
+    scrape_timeout: 5s
+
+    static_configs:
+      - targets: ['freelang-blog:5021']
+        labels:
+          service: 'blog'
+          version: '2.8.0'
+
+    # 메트릭 재레이블링
+    relabel_configs:
+      # 인스턴스 이름 커스터마이징
+      - source_labels: [__address__]
+        target_label: instance
+
+    # 메트릭 드롭 (필요 없는 메트릭 제외)
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'go_.*'
+        action: drop
+
+  # 3. Node Exporter (선택사항: 시스템 리소스 모니터링)
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+
+  # 4. PostgreSQL Exporter (DB 모니터링)
+  - job_name: 'postgres-exporter'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+
+  # 5. Redis Exporter (캐시 모니터링)
+  - job_name: 'redis-exporter'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+
+# ============================================================================
+# 원격 저장소 설정 (선택사항)
+# ============================================================================
+
+# 장기 메트릭 저장을 위해 원격 Thanos/Cortex 사용 가능
+# remote_write:
+#   - url: "http://thanos-receive:19291/api/v1/receive"
+#     write_relabel_configs:
+#       - source_labels: [__name__]
+#         regex: 'freelang_.*'
+#         action: keep
+
+# ============================================================================
+# 서비스 디스커버리 (선택사항)
+# ============================================================================
+
+# Docker 환경에서 자동 디스커버리 설정 가능
+# - job_name: 'docker-sd'
+#   docker_sd_configs:
+#     - host: unix:///var/run/docker.sock

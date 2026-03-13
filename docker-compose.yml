@@ -44,6 +44,8 @@ services:
       - ./static:/app/static                # 웹 페이지
       - ./freelang:/app/freelang            # FreeLang 소스
       - ./backend:/app/backend              # 백엔드 코드
+      - /logs:/app/logs                     # 로그 저장 (모니터링)
+      - /backups:/app/backups               # 백업 저장 (Task 3)
       - /app/node_modules                   # node_modules 제외 (읽기 전용)
 
     # 리스타트 정책
@@ -85,6 +87,8 @@ services:
         condition: service_healthy
       nginx:
         condition: service_started
+      prometheus:
+        condition: service_healthy
 
     # 보안 설정
     security_opt:
@@ -204,7 +208,7 @@ services:
     profiles:
       - cache
 
-  # ==================== Monitoring (선택사항) ====================
+  # ==================== Monitoring (프로덕션 필수) ====================
   prometheus:
     image: prom/prometheus:latest
     container_name: freelang-hybrid-prometheus
@@ -217,24 +221,37 @@ services:
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
+      - /logs:/logs:ro
 
     # 명령어
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-admin-api'
+
+    # 환경 변수
+    environment:
+      - TZ=Asia/Seoul
 
     # 네트워크
     networks:
       - freelang-network
 
+    # 헬스 체크
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
     # 리스타트
     restart: unless-stopped
 
-    # 프로필
-    profiles:
-      - monitoring
+    # 주석: profiles 제거 → Prometheus 항상 활성화 (모니터링 필수)
 
 # ==================== 네트워크 ====================
 networks:

@@ -1,0 +1,108 @@
+# ============================================================================
+# Prometheus Alerting Rules for FreeLang Blog
+# ============================================================================
+# 경고 조건 정의: 비정상 상태 감지 시 알림
+
+groups:
+  - name: freelang_alerts
+    interval: 15s
+    rules:
+      # 1. 서버 다운 감지
+      - alert: ServerDown
+        expr: up{job="freelang-blog"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "FreeLang 서버 다운"
+          description: "FreeLang Blog 서버가 {{ $value }}분 이상 응답하지 않음"
+
+      # 2. 높은 에러율
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "높은 서버 에러율"
+          description: "5분간 5xx 에러율이 5% 초과: {{ $value | humanizePercentage }}"
+
+      # 3. 응답 시간 초과
+      - alert: HighLatency
+        expr: histogram_quantile(0.99, http_request_duration_seconds) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "높은 응답 지연"
+          description: "99 백분위 응답 시간이 2초 초과: {{ $value }}s"
+
+      # 4. 메모리 부족
+      - alert: HighMemoryUsage
+        expr: container_memory_usage_bytes{name="freelang-hybrid-api"} / 1073741824 > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "높은 메모리 사용"
+          description: "API 컨테이너 메모리 사용: {{ $value | humanize }}GB"
+
+      # 5. 디스크 용량 부족
+      - alert: DiskSpaceWarning
+        expr: node_filesystem_avail_bytes{mountpoint="/",fstype=~"ext4|xfs"} / 1073741824 < 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "디스크 용량 부족"
+          description: "사용 가능한 디스크: {{ $value | humanize }}GB"
+
+      # 6. 데이터베이스 연결 실패
+      - alert: DatabaseConnectionFailed
+        expr: pg_up{job="postgres-exporter"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL 연결 실패"
+          description: "PostgreSQL 데이터베이스 연결 실패"
+
+      # 7. 캐시 성능 저하
+      - alert: LowCacheHitRate
+        expr: rate(cache_hits_total[5m]) / rate(cache_requests_total[5m]) < 0.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "낮은 캐시 히트율"
+          description: "캐시 히트율 5분 평균: {{ $value | humanizePercentage }}"
+
+      # 8. 데이터베이스 느린 쿼리
+      - alert: SlowQueryDetected
+        expr: rate(pg_stat_statements_mean_time{query!~".*VACUUM.*"}[5m]) > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "느린 데이터베이스 쿼리 감지"
+          description: "평균 쿼리 시간: {{ $value }}ms"
+
+      # 9. 로그 저장소 가득 참
+      - alert: LogStorageWarning
+        expr: node_filesystem_avail_bytes{mountpoint="/logs"} / 1073741824 < 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "로그 저장소 용량 부족"
+          description: "사용 가능한 로그 저장소: {{ $value | humanize }}GB"
+
+      # 10. 비정상적인 요청 급증
+      - alert: RequestSpike
+        expr: rate(http_requests_total[5m]) > 1000
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "비정상적인 요청 급증"
+          description: "5분 평균 요청 수: {{ $value }} req/s"
