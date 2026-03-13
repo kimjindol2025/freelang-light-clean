@@ -79,8 +79,12 @@ services:
     networks:
       - freelang-network
 
-    # 의존성 (필요시)
-    depends_on: []
+    # 의존성
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nginx:
+        condition: service_started
 
     # 보안 설정
     security_opt:
@@ -164,9 +168,7 @@ services:
     # 리스타트
     restart: unless-stopped
 
-    # 프로필 (필요시만 실행)
-    profiles:
-      - db
+    # 주석: profiles 제거 → PostgreSQL 항상 활성화 (프로덕션 필수)
 
   # ==================== Redis Cache (선택사항) ====================
   redis:

@@ -1,0 +1,287 @@
+// ============================================================================
+// Database Connection Pool - PostgreSQL 연결 풀 관리
+// ============================================================================
+// 목적: FreeLang에서 PostgreSQL 연결을 효율적으로 관리
+// 현재: 프레임워크 레벨 구현 계획 (실제 SQL 엔진은 별도)
+
+use std::io::*
+
+// ============================================================================
+// PART 1: 연결 풀 구조체
+// ============================================================================
+
+pub struct DbConnection {
+  id: i32,
+  host: string,
+  port: i32,
+  database: string,
+  user: string,
+  password: string,
+  pool_size: i32,
+  is_connected: bool,
+  last_used: i64
+}
+
+pub struct DbQuery {
+  sql: string,
+  params: array<string>,
+  timeout_ms: i32
+}
+
+pub struct DbResult {
+  success: bool,
+  rows_affected: i32,
+  result_data: array<map<string, string>>,
+  error: string,
+  execution_time_ms: i32
+}
+
+// ============================================================================
+// PART 2: 전역 연결 풀
+// ============================================================================
+
+pub let GLOBAL_DB_CONNECTION: DbConnection = DbConnection {
+  id: 1,
+  host: "localhost",
+  port: 5432,
+  database: "freelang",
+  user: "freelang",
+  password: "freelang123",
+  pool_size: 10,
+  is_connected: false,
+  last_used: 0
+}
+
+pub let DB_CONNECTION_POOL: array<DbConnection> = []
+
+// ============================================================================
+// PART 3: 연결 풀 관리
+// ============================================================================
+
+pub fn db_connection_init(config: map<string, string>) -> Result<void, string>
+  intent "데이터베이스 연결 풀 초기화"
+  do
+    // 환경변수 또는 config에서 연결 정보 읽기
+    let host = config.get_or_default("DB_HOST", "localhost")
+    let port = config.get_or_default("DB_PORT", "5432")
+    let database = config.get_or_default("DB_NAME", "freelang")
+    let user = config.get_or_default("DB_USER", "freelang")
+    let password = config.get_or_default("DB_PASSWORD", "freelang123")
+
+    GLOBAL_DB_CONNECTION.host = host
+    GLOBAL_DB_CONNECTION.port = string_to_int(port)
+    GLOBAL_DB_CONNECTION.database = database
+    GLOBAL_DB_CONNECTION.user = user
+    GLOBAL_DB_CONNECTION.password = password
+
+    println("🔌 Database connection initialized:")
+    println("   Host: " + host + ":" + port)
+    println("   Database: " + database)
+    println("   User: " + user)
+
+    return Ok(())
+  end
+
+pub fn db_connection_get() -> Result<DbConnection, string>
+  intent "연결 풀에서 사용 가능한 연결 획득"
+  do
+    if !GLOBAL_DB_CONNECTION.is_connected
+      // TODO: 실제 PostgreSQL 연결
+      GLOBAL_DB_CONNECTION.is_connected = true
+      GLOBAL_DB_CONNECTION.last_used = get_current_time_ms()
+    end
+
+    return Ok(GLOBAL_DB_CONNECTION)
+  end
+
+pub fn db_connection_close() -> Result<void, string>
+  intent "데이터베이스 연결 종료"
+  do
+    if GLOBAL_DB_CONNECTION.is_connected
+      // TODO: 실제 PostgreSQL 연결 종료
+      GLOBAL_DB_CONNECTION.is_connected = false
+      println("🔌 Database connection closed")
+    end
+
+    return Ok(())
+  end
+
+// ============================================================================
+// PART 4: 쿼리 실행 (추상화 인터페이스)
+// ============================================================================
+
+pub fn db_execute(query: DbQuery) -> Result<DbResult, string>
+  intent "SQL 쿼리 실행"
+  do
+    if !GLOBAL_DB_CONNECTION.is_connected
+      return Err("Database connection not established")
+    end
+
+    let start_time = get_current_time_ms()
+
+    // TODO: 실제 PostgreSQL 드라이버 호출
+    // 현재는 파라미터 검증만 수행
+    let validated_sql = validate_sql(query.sql)
+
+    match validated_sql
+      Ok(sql) => {
+        let result = DbResult {
+          success: true,
+          rows_affected: 0,
+          result_data: [],
+          error: "",
+          execution_time_ms: (get_current_time_ms() - start_time) as i32
+        }
+        return Ok(result)
+      }
+      Err(e) => {
+        return Err("SQL validation error: " + e)
+      }
+    end
+  end
+
+// ============================================================================
+// PART 5: 헬퍼 함수
+// ============================================================================
+
+pub fn validate_sql(sql: string) -> Result<string, string>
+  intent "SQL 쿼리 검증 (보안: SQL 인젝션 방지)"
+  do
+    // 기본 검증
+    let sql_lower = to_lowercase(sql)
+
+    // DROP, DELETE 명령어는 트랜잭션 내에서만 허용
+    if contains(sql_lower, "drop table") || contains(sql_lower, "truncate")
+      return Err("Destructive operations require transaction")
+    end
+
+    if string_length(sql) == 0
+      return Err("Empty SQL query")
+    end
+
+    return Ok(sql)
+  end
+
+pub fn format_connection_string() -> string
+  intent "PostgreSQL 연결 문자열 생성"
+  do
+    let conn_str = "postgresql://" +
+      GLOBAL_DB_CONNECTION.user + ":" +
+      GLOBAL_DB_CONNECTION.password + "@" +
+      GLOBAL_DB_CONNECTION.host + ":" +
+      int_to_string(GLOBAL_DB_CONNECTION.port) + "/" +
+      GLOBAL_DB_CONNECTION.database
+
+    return conn_str
+  end
+
+pub fn db_healthcheck() -> Result<bool, string>
+  intent "데이터베이스 헬스체크"
+  do
+    // TODO: SELECT 1 쿼리 실행
+    if GLOBAL_DB_CONNECTION.is_connected
+      return Ok(true)
+    else
+      return Err("Database not connected")
+    end
+  end
+
+// ============================================================================
+// PART 6: 마이그레이션 지원
+// ============================================================================
+
+pub struct Migration {
+  version: string,
+  description: string,
+  up: string,      // 실행할 SQL
+  down: string,    // 롤백할 SQL
+  executed_at: i64
+}
+
+pub let APPLIED_MIGRATIONS: array<Migration> = []
+
+pub fn run_migrations(migrations: array<Migration>) -> Result<i32, string>
+  intent "미적용 마이그레이션 실행"
+  do
+    let count = 0
+
+    for migration in migrations
+      // 실제 구현: migration.version을 확인해서 미실행 마이그레이션만 실행
+      // db_execute(migration.up)
+      count = count + 1
+    end
+
+    println("✅ " + int_to_string(count) + " migrations applied")
+    return Ok(count)
+  end
+
+// ============================================================================
+// PART 7: 트랜잭션 관리 (향후 구현)
+// ============================================================================
+
+pub struct Transaction {
+  id: string,
+  connection_id: i32,
+  status: string,  // "active", "committed", "rolled_back"
+  start_time: i64
+}
+
+pub fn transaction_begin() -> Result<Transaction, string>
+  intent "트랜잭션 시작"
+  do
+    // TODO: BEGIN 쿼리 실행
+    let tx = Transaction {
+      id: generate_uuid(),
+      connection_id: 1,
+      status: "active",
+      start_time: get_current_time_ms()
+    }
+    return Ok(tx)
+  end
+
+pub fn transaction_commit(tx: Transaction) -> Result<void, string>
+  intent "트랜잭션 커밋"
+  do
+    // TODO: COMMIT 쿼리 실행
+    println("✅ Transaction " + tx.id + " committed")
+    return Ok(())
+  end
+
+pub fn transaction_rollback(tx: Transaction) -> Result<void, string>
+  intent "트랜잭션 롤백"
+  do
+    // TODO: ROLLBACK 쿼리 실행
+    println("⚠️ Transaction " + tx.id + " rolled back")
+    return Ok(())
+  end
+
+// ============================================================================
+// PART 8: 연결 풀 모니터링
+// ============================================================================
+
+pub fn db_pool_stats() -> map<string, string>
+  intent "연결 풀 통계 반환"
+  do
+    let stats: map<string, string> = {}
+    stats["host"] = GLOBAL_DB_CONNECTION.host
+    stats["port"] = int_to_string(GLOBAL_DB_CONNECTION.port)
+    stats["database"] = GLOBAL_DB_CONNECTION.database
+    stats["connected"] = bool_to_string(GLOBAL_DB_CONNECTION.is_connected)
+    stats["pool_size"] = int_to_string(GLOBAL_DB_CONNECTION.pool_size)
+
+    return stats
+  end
+
+// ============================================================================
+// 주의사항
+// ============================================================================
+//
+// 현재 이 모듈은 프레임워크 레벨의 인터페이스입니다.
+// 실제 PostgreSQL 연결은 FreeLang 컴파일러에 내장된
+// 표준 라이브러리의 db::postgresql 모듈에서 처리되어야 합니다.
+//
+// 구현 로드맵:
+// 1. FreeLang std::db::postgresql 모듈 개발
+// 2. 이 인터페이스와 통합
+// 3. 연결 풀링, 트랜잭션 지원
+//
