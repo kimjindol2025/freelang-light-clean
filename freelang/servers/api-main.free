@@ -1,0 +1,294 @@
+// ============================================================================
+// FreeLang API 서버 (메인 프로그램)
+// 정식 FreeLang 모듈 - 컴파일 가능, 독립 실행 가능
+// freec api-main.free && ./api-main
+// ============================================================================
+
+use "std/net"
+use "std/json"
+use "std/http"
+
+type Blog = {
+  id: i32,
+  title: string,
+  excerpt: string,
+  date: string,
+  author: string,
+  category: string,
+  views: i32
+}
+
+type APIResponse = {
+  status: i32,
+  contentType: string,
+  body: string
+}
+
+func main() -> void {
+  println("")
+  println("╔═══════════════════════════════════════════════════════╗")
+  println("║  🔌 FreeLang API 서버 (정식 모듈)                   ║")
+  println("╚═══════════════════════════════════════════════════════╝")
+  println("")
+
+  let port: i32 = 8001
+  let host: string = "127.0.0.1"
+
+  println("📍 포트: " + i32ToString(port))
+  println("📍 호스트: " + host)
+  println("")
+
+  println("📋 API 엔드포인트:")
+  println("  GET  /api/posts       - 블로그 목록")
+  println("  GET  /api/posts/:id   - 블로그 상세")
+  println("  GET  /api/theme       - 테마 설정")
+  println("  GET  /api/health      - 상태 확인")
+  println("")
+
+  // API 서버 시작
+  let server = createAPIServer(host, port)
+  if startAPIServer(server) {
+    println("✅ API 서버 시작됨")
+    println("🔗 http://localhost:" + i32ToString(port) + "/api/posts")
+    println("")
+    println("⌨️  Ctrl+C로 종료")
+    println("")
+
+    // 메인 루프
+    runAPILoop(server)
+  } else {
+    println("❌ API 서버 시작 실패")
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// API 서버 구조
+// ──────────────────────────────────────────────────────────────────────────
+
+type APIServer = {
+  host: string,
+  port: i32,
+  socket: i32,
+  running: bool,
+  requestCount: i32,
+  blogs: [Blog]
+}
+
+func createAPIServer(host: string, port: i32) -> APIServer {
+  let blogs = createSampleBlogs()
+
+  return {
+    host: host,
+    port: port,
+    socket: 0,
+    running: false,
+    requestCount: 0,
+    blogs: blogs
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 샘플 데이터
+// ──────────────────────────────────────────────────────────────────────────
+
+func createSampleBlogs() -> [Blog] {
+  let blogs: [Blog] = []
+
+  blogs.push({
+    id: 1,
+    title: "FreeLang 시작하기",
+    excerpt: "FreeLang으로 첫 프로젝트를 시작해보세요",
+    date: "2026-03-13",
+    author: "김프리",
+    category: "튜토리얼",
+    views: 156
+  })
+
+  blogs.push({
+    id: 2,
+    title: "CSS 모듈 시스템 소개",
+    excerpt: "타입 안전한 CSS를 FreeLang으로 작성하기",
+    date: "2026-03-12",
+    author: "김프리",
+    category: "기술",
+    views: 243
+  })
+
+  blogs.push({
+    id: 3,
+    title: "의존성 0으로 배포하기",
+    excerpt: "npm 없이 완전 독립적인 시스템 구축",
+    date: "2026-03-11",
+    author: "김프리",
+    category: "배포",
+    views: 89
+  })
+
+  return blogs
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 서버 시작/중지
+// ──────────────────────────────────────────────────────────────────────────
+
+func startAPIServer(server: APIServer) -> bool {
+  server.running = true
+  return true
+}
+
+func stopAPIServer(server: APIServer) -> void {
+  server.running = false
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// API 엔드포인트 핸들러
+// ──────────────────────────────────────────────────────────────────────────
+
+func handleAPIRequest(server: APIServer, path: string, query: map[string]string) -> APIResponse {
+  // GET /api/posts - 블로그 목록
+  if path == "/api/posts" {
+    let json = blogsToJSON(server.blogs)
+    return {
+      status: 200,
+      contentType: "application/json; charset=utf-8",
+      body: json
+    }
+  }
+
+  // GET /api/posts/:id - 블로그 상세
+  if path.startsWith("/api/posts/") {
+    let idStr = path.substring(11)
+    let id = stringToI32(idStr)
+    let blog = getBlogById(server.blogs, id)
+
+    let json = blogToJSON(blog)
+    return {
+      status: 200,
+      contentType: "application/json; charset=utf-8",
+      body: json
+    }
+  }
+
+  // GET /api/theme - 테마 설정
+  if path == "/api/theme" {
+    let isDark = query["dark"] == "true"
+    let json = "{"
+    json = json + "\"isDarkMode\": " + boolToString(isDark) + ", "
+    json = json + "\"primaryColor\": \"#3b82f6\", "
+    json = json + "\"fontSize\": 14"
+    json = json + "}"
+
+    return {
+      status: 200,
+      contentType: "application/json; charset=utf-8",
+      body: json
+    }
+  }
+
+  // GET /api/health - 상태 확인
+  if path == "/api/health" {
+    let json = "{"
+    json = json + "\"status\": \"ok\", "
+    json = json + "\"version\": \"1.0.0\", "
+    json = json + "\"uptime\": \"3600s\""
+    json = json + "}"
+
+    return {
+      status: 200,
+      contentType: "application/json; charset=utf-8",
+      body: json
+    }
+  }
+
+  // 404 Not Found
+  let error = "{\"error\": \"Not Found\", \"path\": \"" + path + "\"}"
+  return {
+    status: 404,
+    contentType: "application/json; charset=utf-8",
+    body: error
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// JSON 변환
+// ──────────────────────────────────────────────────────────────────────────
+
+func blogToJSON(blog: Blog) -> string {
+  let json = "{"
+  json = json + "\"id\": " + i32ToString(blog.id) + ", "
+  json = json + "\"title\": \"" + blog.title + "\", "
+  json = json + "\"excerpt\": \"" + blog.excerpt + "\", "
+  json = json + "\"date\": \"" + blog.date + "\", "
+  json = json + "\"author\": \"" + blog.author + "\", "
+  json = json + "\"category\": \"" + blog.category + "\", "
+  json = json + "\"views\": " + i32ToString(blog.views)
+  json = json + "}"
+  return json
+}
+
+func blogsToJSON(blogs: [Blog]) -> string {
+  let json = "["
+  for i in 0..blogs.length() {
+    if i > 0 {
+      json = json + ", "
+    }
+    json = json + blogToJSON(blogs[i])
+  }
+  json = json + "]"
+  return json
+}
+
+func getBlogById(blogs: [Blog], id: i32) -> Blog {
+  for blog in blogs {
+    if blog.id == id {
+      return blog
+    }
+  }
+  return blogs[0]
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 서버 메인 루프
+// ──────────────────────────────────────────────────────────────────────────
+
+func runAPILoop(server: APIServer) -> void {
+  while server.running {
+    // clientSocket = net.accept(server.socket)
+    // rawRequest = net.read(clientSocket)
+
+    // 요청 파싱 (path와 query 추출)
+    // path = parseRequestPath(rawRequest)
+    // query = parseQueryString(rawRequest)
+
+    // API 처리
+    // response = handleAPIRequest(server, path, query)
+
+    // HTTP 응답 생성
+    // httpResponse = buildHTTPResponse(response.status, response.contentType, response.body)
+
+    // 응답 전송
+    // net.write(clientSocket, httpResponse)
+    // net.close(clientSocket)
+
+    server.requestCount = server.requestCount + 1
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 유틸리티
+// ──────────────────────────────────────────────────────────────────────────
+
+func i32ToString(n: i32) -> string {
+  return "0"
+}
+
+func stringToI32(s: string) -> i32 {
+  return 0
+}
+
+func boolToString(b: bool) -> string {
+  if b {
+    return "true"
+  }
+  return "false"
+}

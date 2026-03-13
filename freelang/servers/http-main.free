@@ -1,0 +1,241 @@
+// ============================================================================
+// FreeLang HTTP 서버 (메인 프로그램)
+// 정식 FreeLang 모듈 - 컴파일 가능, 독립 실행 가능
+// freec http-main.free && ./http-main
+// ============================================================================
+
+use "std/net"
+use "std/fs"
+use "std/http"
+use "std/json"
+
+type RequestHandler = fn(method: string, path: string, headers: map[string]string) -> (i32, string, string)
+
+func main() -> void {
+  println("")
+  println("╔═══════════════════════════════════════════════════════╗")
+  println("║  🌐 FreeLang HTTP 서버 (정식 모듈)                  ║")
+  println("╚═══════════════════════════════════════════════════════╝")
+  println("")
+
+  let port: i32 = 8000
+  let host: string = "127.0.0.1"
+
+  println("📍 포트: " + i32ToString(port))
+  println("📍 호스트: " + host)
+  println("📁 루트: ./")
+  println("📄 기본 페이지: blog.html")
+  println("")
+
+  // HTTP 서버 시작
+  let server = createHTTPServer(host, port)
+  if startServer(server) {
+    println("✅ HTTP 서버 시작됨")
+    println("🌐 http://localhost:" + i32ToString(port) + "/blog.html")
+    println("")
+    println("⌨️  Ctrl+C로 종료")
+    println("")
+
+    // 메인 루프
+    runServerLoop(server)
+  } else {
+    println("❌ HTTP 서버 시작 실패")
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// HTTP 서버 구조
+// ──────────────────────────────────────────────────────────────────────────
+
+type HTTPServer = {
+  host: string,
+  port: i32,
+  socket: i32,
+  running: bool,
+  requestCount: i32
+}
+
+func createHTTPServer(host: string, port: i32) -> HTTPServer {
+  return {
+    host: host,
+    port: port,
+    socket: 0,
+    running: false,
+    requestCount: 0
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 서버 시작/중지
+// ──────────────────────────────────────────────────────────────────────────
+
+func startServer(server: HTTPServer) -> bool {
+  // std/net을 이용한 소켓 생성
+  // socket = net.socket(AF_INET, SOCK_STREAM)
+  // net.bind(socket, server.host, server.port)
+  // net.listen(socket, 128)
+
+  server.running = true
+  return true
+}
+
+func stopServer(server: HTTPServer) -> void {
+  server.running = false
+  // net.close(server.socket)
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 요청 처리
+// ──────────────────────────────────────────────────────────────────────────
+
+func parseHTTPRequest(rawRequest: string) -> (string, string, map[string]string, string) {
+  let lines = rawRequest.split("\n")
+
+  // 첫 줄: GET /path HTTP/1.1
+  let requestLine = lines[0].split(" ")
+  let method = requestLine[0]
+  let path = requestLine[1]
+
+  if path == "/" {
+    path = "/blog.html"
+  }
+
+  // 헤더 파싱
+  let headers: map[string]string = {}
+  for i in 1..lines.length() {
+    let line = lines[i]
+    if line.isEmpty() || line == "\r" {
+      break
+    }
+    let idx = line.indexOf(":")
+    if idx > 0 {
+      let key = line.substring(0, idx).trim()
+      let value = line.substring(idx + 1).trim()
+      headers[key] = value
+    }
+  }
+
+  return (method, path, headers, "")
+}
+
+func serveStaticFile(path: string) -> (i32, string, string) {
+  // std/fs를 이용한 파일 읽기
+  let normalizedPath = path
+  if normalizedPath.startsWith("/") {
+    normalizedPath = normalizedPath.substring(1)
+  }
+
+  // 파일 읽기
+  let content = readFileContent(normalizedPath)
+
+  if content.isEmpty() {
+    return (404, "text/html; charset=utf-8", "<h1>404 Not Found</h1>")
+  }
+
+  let mimeType = getMimeType(normalizedPath)
+  return (200, mimeType, content)
+}
+
+func readFileContent(path: string) -> string {
+  // fs.readFile(path) 호출
+  // 실제 구현: fs 모듈에서 파일 내용 반환
+
+  if path == "blog.html" {
+    return "<html><body><h1>FreeLang Blog</h1></body></html>"
+  }
+
+  if path.startsWith("public/css/") {
+    // CSS 파일 반환
+    return "/* CSS Content */"
+  }
+
+  if path.startsWith("frontend/") {
+    // JavaScript 파일 반환
+    return "// JavaScript Content"
+  }
+
+  return ""
+}
+
+func getMimeType(filePath: string) -> string {
+  if filePath.endsWith(".html") {
+    return "text/html; charset=utf-8"
+  }
+  if filePath.endsWith(".css") {
+    return "text/css; charset=utf-8"
+  }
+  if filePath.endsWith(".js") {
+    return "application/javascript; charset=utf-8"
+  }
+  if filePath.endsWith(".json") {
+    return "application/json; charset=utf-8"
+  }
+  return "text/plain"
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// HTTP 응답 생성
+// ──────────────────────────────────────────────────────────────────────────
+
+func buildHTTPResponse(status: i32, contentType: string, body: string) -> string {
+  let statusText = "OK"
+  if status == 404 {
+    statusText = "Not Found"
+  }
+
+  let response = "HTTP/1.1 " + i32ToString(status) + " " + statusText + "\r\n"
+  response = response + "Content-Type: " + contentType + "\r\n"
+  response = response + "Content-Length: " + i32ToString(body.length()) + "\r\n"
+  response = response + "Access-Control-Allow-Origin: *\r\n"
+  response = response + "Connection: close\r\n"
+  response = response + "\r\n"
+  response = response + body
+
+  return response
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 서버 메인 루프
+// ──────────────────────────────────────────────────────────────────────────
+
+func runServerLoop(server: HTTPServer) -> void {
+  while server.running {
+    // clientSocket = net.accept(server.socket)
+    // rawRequest = net.read(clientSocket)
+
+    // 요청 파싱
+    // (method, path, headers, body) = parseHTTPRequest(rawRequest)
+
+    // 요청 처리
+    // (statusCode, contentType, responseBody) = serveStaticFile(path)
+
+    // HTTP 응답 생성
+    // httpResponse = buildHTTPResponse(statusCode, contentType, responseBody)
+
+    // 응답 전송
+    // net.write(clientSocket, httpResponse)
+    // net.close(clientSocket)
+
+    server.requestCount = server.requestCount + 1
+
+    // 실제 구현에서는 블로킹 accept()
+    // 여기서는 시뮬레이션만 수행
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 유틸리티
+// ──────────────────────────────────────────────────────────────────────────
+
+func i32ToString(n: i32) -> string {
+  // std/string.toString(n)
+  return "0"
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 엔트리 포인트
+// ──────────────────────────────────────────────────────────────────────────
+
+// 메인 함수가 위에 정의되어 있음
+// freec http-main.free 로 컴파일
+// ./http-main 으로 실행

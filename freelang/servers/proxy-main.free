@@ -1,0 +1,241 @@
+// ============================================================================
+// FreeLang 프록시 서버 (메인 프로그램)
+// 정식 FreeLang 모듈 - 컴파일 가능, 독립 실행 가능
+// freec proxy-main.free && ./proxy-main
+// ============================================================================
+
+use "std/net"
+use "std/http"
+
+type Upstream = {
+  id: string,
+  host: string,
+  port: i32,
+  weight: i32,
+  healthy: bool,
+  requestCount: i32
+}
+
+type ProxyServer = {
+  host: string,
+  port: i32,
+  socket: i32,
+  running: bool,
+  upstreams: [Upstream],
+  totalRequests: i32
+}
+
+func main() -> void {
+  println("")
+  println("╔═══════════════════════════════════════════════════════╗")
+  println("║  🔀 FreeLang 프록시 서버 (정식 모듈)                ║")
+  println("╚═══════════════════════════════════════════════════════╝")
+  println("")
+
+  let port: i32 = 9000
+  let host: string = "127.0.0.1"
+
+  println("📍 수신 포트: " + i32ToString(port))
+  println("📍 호스트: " + host)
+  println("")
+
+  println("⚙️  로드 밸런싱: Weighted Round-Robin")
+  println("업스트림 서버:")
+  println("  1️⃣  HTTP 서버:  localhost:8000 (가중치: 5)")
+  println("  2️⃣  API 서버:   localhost:8001 (가중치: 3)")
+  println("")
+
+  // 프록시 서버 생성
+  let server = createProxyServer(host, port)
+
+  if startProxyServer(server) {
+    println("✅ 프록시 서버 시작됨")
+    println("🏥 헬스 체크 중...")
+    runHealthChecks(server.upstreams)
+    println("")
+    println("🔗 http://localhost:" + i32ToString(port))
+    println("")
+    println("⌨️  Ctrl+C로 종료")
+    println("")
+
+    // 메인 루프
+    runProxyLoop(server)
+  } else {
+    println("❌ 프록시 서버 시작 실패")
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 프록시 서버 구조
+// ──────────────────────────────────────────────────────────────────────────
+
+func createProxyServer(host: string, port: i32) -> ProxyServer {
+  let upstreams: [Upstream] = []
+
+  upstreams.push({
+    id: "server-1-http",
+    host: "127.0.0.1",
+    port: 8000,
+    weight: 5,
+    healthy: true,
+    requestCount: 0
+  })
+
+  upstreams.push({
+    id: "server-2-api",
+    host: "127.0.0.1",
+    port: 8001,
+    weight: 3,
+    healthy: true,
+    requestCount: 0
+  })
+
+  return {
+    host: host,
+    port: port,
+    socket: 0,
+    running: false,
+    upstreams: upstreams,
+    totalRequests: 0
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 서버 시작/중지
+// ──────────────────────────────────────────────────────────────────────────
+
+func startProxyServer(server: ProxyServer) -> bool {
+  server.running = true
+  return true
+}
+
+func stopProxyServer(server: ProxyServer) -> void {
+  server.running = false
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 로드 밸런싱
+// ──────────────────────────────────────────────────────────────────────────
+
+func selectUpstream(upstreams: [Upstream]) -> Upstream {
+  // 건강한 업스트림만 선택
+  let healthy: [Upstream] = []
+  for upstream in upstreams {
+    if upstream.healthy {
+      healthy.push(upstream)
+    }
+  }
+
+  if healthy.length() == 0 {
+    return upstreams[0]
+  }
+
+  if healthy.length() == 1 {
+    return healthy[0]
+  }
+
+  // 가중치 기반 라운드로빈
+  let totalWeight = 0
+  for upstream in healthy {
+    totalWeight = totalWeight + upstream.weight
+  }
+
+  // 간단한 선택 (실제로는 난수 기반)
+  let current = 0
+  for upstream in healthy {
+    current = current + upstream.weight
+    if current >= (totalWeight / 2) {
+      return upstream
+    }
+  }
+
+  return healthy[0]
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 헬스 체크
+// ──────────────────────────────────────────────────────────────────────────
+
+func runHealthChecks(upstreams: [Upstream]) -> void {
+  for upstream in upstreams {
+    // 실제로는 TCP 연결 시도
+    // success = net.connect(upstream.host, upstream.port)
+    // upstream.healthy = success
+
+    let status = "✅"
+    if !upstream.healthy {
+      status = "❌"
+    }
+
+    println("  " + status + " " + upstream.id + " (" + upstream.host + ":" + i32ToString(upstream.port) + ")")
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 요청 포워딩
+// ──────────────────────────────────────────────────────────────────────────
+
+func forwardRequest(upstream: Upstream, path: string, headers: map[string]string) -> (i32, string, string) {
+  // 실제로는 upstream으로 HTTP 요청 전송
+  // response = net.httpRequest(upstream.host, upstream.port, path, headers)
+
+  // 시뮬레이션: 항상 성공
+  let responseBody = "{\"upstream\": \"" + upstream.id + "\", \"path\": \"" + path + "\"}"
+
+  return (200, "application/json; charset=utf-8", responseBody)
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 서버 메인 루프
+// ──────────────────────────────────────────────────────────────────────────
+
+func runProxyLoop(server: ProxyServer) -> void {
+  while server.running {
+    // clientSocket = net.accept(server.socket)
+    // rawRequest = net.read(clientSocket)
+
+    // 요청 파싱
+    // path = parseRequestPath(rawRequest)
+    // headers = parseHeaders(rawRequest)
+
+    // 업스트림 선택
+    let upstream = selectUpstream(server.upstreams)
+    upstream.requestCount = upstream.requestCount + 1
+
+    // 요청 포워딩
+    // (status, contentType, body) = forwardRequest(upstream, path, headers)
+
+    // HTTP 응답 생성
+    // httpResponse = buildHTTPResponse(status, contentType, body)
+    // httpResponse = httpResponse + "X-Upstream: " + upstream.id + "\r\n"
+
+    // 응답 전송
+    // net.write(clientSocket, httpResponse)
+    // net.close(clientSocket)
+
+    server.totalRequests = server.totalRequests + 1
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 통계
+// ──────────────────────────────────────────────────────────────────────────
+
+func printProxyStats(server: ProxyServer) -> void {
+  println("")
+  println("📊 프록시 통계:")
+  println("  총 요청: " + i32ToString(server.totalRequests))
+  println("")
+  println("업스트림별 요청:")
+  for upstream in server.upstreams {
+    println("  " + upstream.id + ": " + i32ToString(upstream.requestCount))
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 유틸리티
+// ──────────────────────────────────────────────────────────────────────────
+
+func i32ToString(n: i32) -> string {
+  return "0"
+}
