@@ -286,3 +286,96 @@ Output: ANIMATION_DESIGN(@resolver) AT(@) IDENT(custom) AT(@) IDENT(deprecated)
 **Last Updated**: 2026-03-14 05:15 UTC+9
 **Status**: Phase 10.1 Lexer Enhancement 90% complete
 **Next Session**: Phase 10.2 AST Extension
+
+---
+
+## 🔧 Phase 10.2: AST Extension Details
+
+### What Changed
+
+#### 1. New DesignBlockDeclaration Interface (src/parser/ast.ts)
+
+```typescript
+export interface DesignBlockDeclaration {
+  type: 'animation' | 'glass' | '3d' | 'micro' | 'scroll';
+  name?: string;                // @animation fadeIn의 'fadeIn'
+  content: string;              // 블록의 실제 내용
+  line: number;                 // 원본 파일의 라인 번호
+  column: number;               // 원본 파일의 열 번호
+  properties?: Record<string, string>;  // 파싱된 키-값 쌍
+}
+```
+
+#### 2. Extended Module Interface
+
+```typescript
+export interface Module {
+  // ... existing fields ...
+  designBlocks?: DesignBlockDeclaration[];  // Phase 10 추가
+}
+```
+
+#### 3. Extended Statement Type Union
+
+Design blocks are now valid statements:
+
+```typescript
+export type Statement = 
+  | /* ... existing statements ... */
+  | DesignBlockDeclaration;  // Phase 10 추가
+```
+
+### AST Structure with Design Blocks
+
+**Before Phase 10.2**:
+```
+Module
+├─ imports: ImportStatement[]
+├─ exports: ExportStatement[]
+└─ statements: Statement[]
+```
+
+**After Phase 10.2**:
+```
+Module
+├─ imports: ImportStatement[]
+├─ exports: ExportStatement[]
+├─ designBlocks: DesignBlockDeclaration[]  ← NEW
+└─ statements: Statement[]
+```
+
+### Design Block AST Example
+
+```
+Input: @animation fadeIn { duration: 300 opacity: 0 → 1 }
+
+AST:
+DesignBlockDeclaration {
+  type: 'animation',
+  name: 'fadeIn',
+  content: 'duration: 300 opacity: 0 → 1',
+  line: 5,
+  column: 3,
+  properties: {
+    duration: '300',
+    opacity: '0 → 1'
+  }
+}
+```
+
+### Design Block Declaration Type
+
+| Design Type | Purpose | Properties |
+|------------|---------|-----------|
+| animation | CSS keyframe animations | duration, delay, easing, property mappings |
+| glass | Glassmorphism effects | background, backdropFilter, border |
+| 3d | 3D transforms | perspective, rotateX/Y/Z, scale, translate |
+| micro | Micro-interactions | action, selector, event, duration |
+| scroll | Scroll trigger animations | selector, animation, offset, once |
+
+---
+
+**Status**: Phase 10.2 AST Extension ✅ Complete
+**Files Modified**: src/parser/ast.ts
+**Lines Added**: +28
+

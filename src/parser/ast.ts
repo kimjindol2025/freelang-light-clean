@@ -159,12 +159,35 @@ export interface ExportStatement {
   declaration: FunctionStatement | VariableDeclaration;  // What to export
 }
 
+/**
+ * Phase 10: Design Block Declaration
+ *
+ * .free 파일의 @animation, @glass, @3d, @micro, @scroll 디자인 블록을 나타냄
+ *
+ * 예시:
+ *   @animation fadeIn {
+ *     duration: 300
+ *     opacity: 0 → 1
+ *   }
+ */
+export interface DesignBlockDeclaration {
+  type: 'animation' | 'glass' | '3d' | 'micro' | 'scroll';
+  name?: string;                // @animation fadeIn의 'fadeIn', 없으면 생성된 이름
+  content: string;              // 블록의 실제 내용
+  line: number;                 // 원본 파일의 라인 번호
+  column: number;               // 원본 파일의 열 번호
+
+  // 파싱된 속성 (선택사항)
+  properties?: Record<string, string>;  // duration, opacity 등의 키-값 쌍
+}
+
 // Module (top-level container for a .fl file)
 export interface Module {
   path: string;                // File path or module name
   imports: ImportStatement[];  // Import statements at top
   exports: ExportStatement[];  // Export statements
   statements: Statement[];     // Other statements (functions, variables, etc.)
+  designBlocks?: DesignBlockDeclaration[];  // Phase 10: Design directives (@animation, @glass, @3d, @micro, @scroll)
   lintConfig?: LintConfig;     // Native-Linter: @lint(...) 어노테이션
   allowOrigins?: string[];     // Hardware-CORS: @allow_origin("https://...") 도메인 화이트리스트
   cspPolicy?: string;          // Native-CSP-Shield: @csp_policy(...) 직렬화 문자열
@@ -442,7 +465,8 @@ export type Statement =
   | TestBlock               // Self-Testing Compiler: 내장 테스트 블록
   | AssertStatement         // Self-Testing Compiler: expect 어서션
   | TypeAliasDeclaration    // Reified-Type-System: type X = A | B
-  | StaticAssertDeclaration; // Reified-Type-System: @static_assert_size<T, N>
+  | StaticAssertDeclaration // Reified-Type-System: @static_assert_size<T, N>
+  | DesignBlockDeclaration; // Phase 10: Design directives (@animation, @glass, @3d, @micro, @scroll)
 
 export interface ExpressionStatement {
   type: 'expression';
