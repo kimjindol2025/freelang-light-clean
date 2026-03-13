@@ -1,495 +1,606 @@
-# FreeLang v2.8.0 — Zero-Dependency AI Compiler
+<div align="center">
 
-![Version](https://img.shields.io/badge/version-2.8.0-blue.svg)
-![Status](https://img.shields.io/badge/status-Production%20Ready-brightgreen.svg)
-![Tests](https://img.shields.io/badge/tests-176%2F176%20%E2%9C%85-green.svg)
-![Dependencies](https://img.shields.io/badge/external%20deps-0%25-brightgreen.svg)
-![Self-Hosting](https://img.shields.io/badge/self--hosting-compiler.free-orange.svg)
-![Graph](https://img.shields.io/badge/GraphQL-Native%20(Apollo%20%EB%8C%80%EC%B2%B4)-blueviolet.svg)
-![Expect](https://img.shields.io/badge/Native--Expect-Chai%20%EB%8C%80%EC%B2%B4-red.svg)
+# ✨ FreeLang Light
 
-FreeLang은 **자기 자신의 소스를 컴파일 및 린트할 수 있는** 제로 외부 의존성 AI 기반 프로그래밍 언어입니다.
-Node.js / TypeScript 기반으로 구현되며, ESLint·Apollo Server·PM2 등 주요 외부 패키지를 모두 내부 엔진으로 대체했습니다.
+**웹 프론트엔드 개발을 위한 통합 언어**
 
----
+![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![Status](https://img.shields.io/badge/status-Stable-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-22%2F22%20%E2%9C%85-green.svg)
+![Node](https://img.shields.io/badge/Node.js-18+-339933.svg)
+![Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
-## 핵심 원칙
+**한 파일에서 로직 + 스타일 + 마크업을 정의하고, 자동으로 HTML·CSS·JS 생성** 🚀
 
-| 원칙 | 내용 |
-|------|------|
-| **Zero-Dependency** | npm 외부 패키지 의존 없음. 모든 기능이 FreeLang 내장 |
-| **Self-Hosting** | `compiler.free`가 FreeLang 컴파일러 자신을 컴파일 |
-| **Self-Linting** | `@lint` 어노테이션으로 컴파일러 소스를 빌드 시점에 자동 검사 |
-| **Replace Everything** | ESLint / Apollo / PM2 / Swagger / nodemailer 완전 대체 |
+[설치](#-설치) • [빠른 시작](#-빠른-시작) • [문서](#-문서) • [기여](#-기여) • [라이선스](#-라이선스)
+
+</div>
 
 ---
 
-## 빠른 시작
+## 📋 목차
+
+- [개요](#-개요)
+- [핵심 기능](#-핵심-기능)
+- [설치](#-설치)
+- [빠른 시작](#-빠른-시작)
+- [사용 예제](#-사용-예제)
+- [API 문서](#-api-문서)
+- [아키텍처](#-아키텍처)
+- [개발 로드맵](#-개발-로드맵)
+- [기여](#-기여)
+- [라이선스](#-라이선스)
+
+---
+
+## 🎯 개요
+
+**FreeLang Light**는 단순함과 강력함을 동시에 추구하는 웹 프론트엔드 언어입니다.
+
+```
+컴포넌트.free (단일 파일)
+    ↓ 컴파일
+HTML + CSS + JavaScript
+```
+
+**핵심 특징**:
+- ✅ **단일 파일 개발** - 로직, 스타일, 마크업을 한 곳에서 관리
+- ✅ **자동 컴파일** - CSS, JS, HTML 자동 생성
+- ✅ **검색 기능** - 컴포넌트·함수·Props 빠르게 검색
+- ✅ **REST API** - 서버 기능 제공 (포트 4002)
+- ✅ **CLI 도구** - 명령줄에서 모든 기능 사용
+- ✅ **0 의존성** - Node.js만으로 실행
+
+---
+
+## 🚀 핵심 기능
+
+### Phase 1 ✅ - 기본 컴파일러
+- Tokenizer & Parser (FreeLang 언어 스펙 v1.0)
+- 언어 정의 및 BNF 문법
+- 예제 컴포넌트 (Button, Card)
+
+### Phase 2 ✅ - 인덱싱 & 검색
+- 자동 인덱싱 (Props, Functions, Styles)
+- 검색 API 서버 (포트 4002)
+- 3단어 패턴 검색 (KPM 호환)
+
+### Phase 3 ✅ - 고급 기능
+- 조건부 렌더링 (if/else)
+- 반복 렌더링 (for loop)
+- Props 기본값 처리
+
+### Phase 4 ✅ - 번들러
+- CSS/JS/HTML 병합
+- 코드 최소화 (Minification)
+- 소스맵 생성
+
+---
+
+## 📦 설치
+
+### npm으로 설치
 
 ```bash
-git clone https://gogs.dclub.kr/kim/v2-freelang-ai.git
-cd v2-freelang-ai
+npm install freelang-light
+```
+
+### 로컬에서 빌드
+
+```bash
+git clone https://github.com/kimjindol2025/freelang-light.git
+cd freelang-light
 npm install
 npm run build
-npx ts-node src/cli/index.ts hello.free
-```
-
-### Hello World
-
-```free
-fn main() {
-  println("Hello, FreeLang!")
-}
-
-main()
-```
-
-### Native-Linter 사용
-
-```free
-@lint(no_unused: error, shadowing_check: warn, strict_pointers: true)
-
-fn compute(x: i64) -> i64 {
-  let unused = 99   // ← 빌드 시 즉시 차단: [no_unused] 'unused' is never used
-  return x * 2
-}
-```
-
-```
-[lint] main.free:4:2 ✘ [no_unused] 'unused' is declared but never used (variable)
-[lint] main.free 1 error(s) — rules: no_unused, shadowing_check, strict_pointers
-Error: [Lint-Gate] Build blocked by 1 error(s)
-```
-
-### 데이터베이스
-
-```free
-db_open("myapp.db")
-db_exec("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)")
-db_exec("INSERT INTO users (name) VALUES ('Alice')")
-let users = db_query("SELECT * FROM users")
-println(str(users))
 ```
 
 ---
 
-## v2.8.0 신규 기능
+## ⚡ 빠른 시작
 
-### 1. Native-Expect — Chai 완전 대체
+### 1️⃣ 기본 컴포넌트 작성
 
-외부 라이브러리 없이 언어 파서에 내장된 `expect` 어서션 엔진.
-`expect(actual).to.be.equal(expected)` 형식을 **FreeLang 정규 문법**으로 지원합니다.
-
-**지원 문법**:
+`button.free` 파일을 만드세요:
 
 ```free
-test "연산 결과 검증" {
-  let result = calculate(50)
+component Button {
+  props {
+    label: string = "Click me",
+    type: string = "primary"
+  }
 
-  // 동등 비교
-  expect(result).to.be.equal(100)
+  style {
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      background: #007bff;
+      color: white;
+    }
+    .btn.secondary {
+      background: #6c757d;
+    }
+  }
 
-  // 부등 비교
-  expect(result).to.be.notEqual(99)
-
-  // boolean 검증
-  expect(result > 0).to.be.true()
-  expect(result < 0).to.be.false()
-
-  // 존재 검증 (non-null/falsy 아님)
-  expect(result).to.be.exists()
+  markup {
+    <button class="btn btn-{type}">
+      {label}
+    </button>
+  }
 }
 ```
 
-**실측 결과 (Proof-Tester 실행)**:
-
-```
-  test_expect.fl
-    + 기본 연산 검증 (58ms)
-    + boolean 검증 (20ms)
-    x 실패 케이스 - Error: Expected 999, got 20 - [63:3] expect(...).to.be.equal(...)
-```
-
-**Zero-cost 보장**: `test {}` 블록이 릴리즈 빌드에서 0바이트로 제거되므로
-내부 `expect()` 도 동시에 제거. 프로덕션 바이너리에 어서션 오버헤드 없음.
-
-**컴파일 경로**:
-```
-expect(x).to.be.equal(y)
-  → Parser: AssertStatement { kind:'equal', actual:x, expected:y }
-  → IR Generator: PUSH x, PUSH y, STR_NEW "[loc]", CALL assert_eq
-  → 릴리즈: case 'test': break → 0바이트
-```
-
-**셀프호스팅 증명**: `expect` 파서 자체를 `test {}` 블록 + `expect()`로 검증.
-
-### 2. Native-Linter — ESLint 완전 대체
-
-`@lint(...)` 어노테이션으로 컴파일 시점에 코드 품질을 강제합니다.
-
-```
-src/linter/
-├── lint-gate.ts          # 메인 엔진 (assertLintPassed → 빌드 차단)
-└── rules/
-    ├── no-unused.ts      # 미사용 변수/파라미터 감지
-    ├── no-shadowing.ts   # 변수 섀도잉 감지 (스코프 체인 추적)
-    └── strict-pointers.ts # 포인터 안전성 (malloc/free 짝 검사)
-```
-
-**지원 규칙**:
-
-| 규칙 | 레벨 | 설명 |
-|------|------|------|
-| `no_unused` | `error` / `warn` / `off` | 선언 후 미사용 변수 감지 |
-| `shadowing_check` | `error` / `warn` / `off` | 외부 스코프 변수 재선언 감지 |
-| `strict_pointers` | `true` / `false` | `*type` 포인터 초기화·해제 강제 |
-
-**셀프호스팅 증명**: `src/self-host/compiler.free`에 `@lint` 적용 → 컴파일러 자신의 코드를 자신의 린터로 검사.
-
-### 2. Native-Graph — Apollo Server 완전 대체
-
-외부 GraphQL 라이브러리 없이 FreeLang 내장 GraphQL 엔진. Node.js `http` 모듈만 사용.
-
-**신규 키워드**: `schema` · `query` · `mutation` · `resolver`
-
-**5개 빌트인 함수**:
-
-```
-graph_schema_define(typeName, fieldsJson)  → 타입 레지스트리 정적 등록
-graph_resolver_add(typeName, field, fn)    → 리졸버 디스패치 테이블 바인딩
-graph_server_start(port)                   → POST /graphql + 내장 HTML UI
-graph_execute(gqlString)                   → 서버 없이 GQL 직접 실행 (테스트용)
-graph_server_stop(port)                    → 서버 종료
-```
-
-**실제 사용 예시 (FreeLang 빌트인)**:
-
-```js
-// 1. 스키마 정의 (정적 타입 레지스트리)
-graph_schema_define("Query", '[{"name":"user","type":"User"}]')
-graph_schema_define("User",  '[{"name":"id","type":"Int"},{"name":"name","type":"String"}]')
-
-// 2. 리졸버 등록 (디스패치 테이블 바인딩)
-graph_resolver_add("Query", "user", fn(root, args) {
-  return db_one("SELECT * FROM users WHERE id = ?", map_get(args, "id"))
-})
-
-// 3. 서버 기동 (POST /graphql + GET /graphql HTML UI)
-graph_server_start(4000)
-```
-
-**쿼리 실행**:
+### 2️⃣ 컴파일
 
 ```bash
-# HTTP POST
-curl -X POST http://localhost:4000/graphql \
-  -H "Content-Type: application/json" \
-  -d '{"query":"{ user(id: 1) { id name } }"}'
-# → {"data":{"user":{"id":1,"name":"Alice"}}}
-
-# 단위 테스트 (서버 없이)
-let result = graph_execute('{ user(id: 1) { id name } }')
+npx freelang compile button.free
 ```
 
-**내장 GraphiQL-lite UI**: `GET http://localhost:4000/graphql` → 브라우저에서 스키마 조회 + 쿼리 실행 (외부 CDN 0%)
+**생성되는 파일**:
+- `button.html` - 마크업 템플릿
+- `button.css` - 스타일시트
+- `button.js` - 컴포넌트 로직
 
-**검증 결과** (test-native-graph.js 실제 실행):
-```
-[3] 검증 통과: id=1, name=Alice
-[4] HTTP 응답 200: {"data":{"user":{"id":2,"name":"Bob"}}}
-[4] HTTP 검증 통과: id=2, name=Bob
-```
+### 3️⃣ HTML에서 사용
 
-### 3. MOSS-Compressor — zlib 완전 대체
-
-순수 FreeLang C 구현 DEFLATE + GZIP 압축 엔진.
-
-```free
-let compressed = compress_deflate(data)
-let decompressed = decompress_inflate(compressed)
-let gz = compress_gzip(data, filename: "output.gz")
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="button.css">
+</head>
+<body>
+  <div id="app"></div>
+  <script src="button.js"></script>
+</body>
+</html>
 ```
 
 ---
 
-## 아키텍처
+## 💡 사용 예제
+
+### 예제 1: Card 컴포넌트 (조건부 렌더링)
+
+```free
+component Card {
+  props {
+    title: string,
+    content: string,
+    showFooter: bool = true
+  }
+
+  style {
+    .card {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .card-title {
+      font-weight: bold;
+      font-size: 18px;
+      margin-bottom: 10px;
+    }
+    .card-footer {
+      border-top: 1px solid #eee;
+      margin-top: 15px;
+      padding-top: 15px;
+      text-align: right;
+    }
+  }
+
+  markup {
+    <div class="card">
+      <div class="card-title">{title}</div>
+      <div class="card-content">{content}</div>
+
+      if showFooter {
+        <div class="card-footer">
+          <button>Learn More</button>
+        </div>
+      }
+    </div>
+  }
+}
+```
+
+### 예제 2: List 컴포넌트 (반복 렌더링)
+
+```free
+component List {
+  props {
+    items: array<object> = [],
+    keyField: string = "id"
+  }
+
+  style {
+    .list-item {
+      padding: 12px;
+      border-bottom: 1px solid #f0f0f0;
+      transition: background 0.2s;
+    }
+    .list-item:hover {
+      background: #f5f5f5;
+    }
+  }
+
+  markup {
+    <div class="list">
+      for item in items {
+        <div class="list-item" key={item[keyField]}>
+          {str(item)}
+        </div>
+      }
+    </div>
+  }
+}
+```
+
+---
+
+## 📚 API 문서
+
+### CLI 명령어
+
+```bash
+# 컴파일
+npx freelang compile <file>
+
+# 검색
+npx freelang search <query>
+
+# 인덱싱
+npx freelang index <directory>
+
+# 개발 서버 시작 (포트 4002)
+npx freelang serve
+
+# 컴포넌트 목록 조회
+npx freelang list
+
+# 통계 출력
+npx freelang stats
+```
+
+### REST API 엔드포인트
+
+```
+GET  /api/search?q=<query>              # 검색
+GET  /api/search-three-words?q=<words>  # 3단어 패턴 검색
+GET  /api/component/<name>              # 컴포넌트 상세 조회
+GET  /api/components                    # 모든 컴포넌트 목록
+```
+
+### 검색 예제
+
+```bash
+# 함수로 검색
+curl http://localhost:4002/api/search?q=renderList
+
+# Props로 검색
+curl http://localhost:4002/api/search?q=label
+
+# 결과
+{
+  "results": [
+    {
+      "type": "function",
+      "name": "renderList",
+      "component": "List",
+      "file": "examples/list.free",
+      "line": 12,
+      "rank": 95
+    }
+  ]
+}
+```
+
+---
+
+## 🏗️ 아키텍처
 
 ### 컴파일 파이프라인
 
 ```
-Source (.free)
+component.free
     │
     ▼
-┌─────────────┐
-│   @lint     │  ← Native-Linter (빌드 시점 검사)
-│  Lint-Gate  │
-└─────────────┘
-    │ pass
+┌──────────────────┐
+│ Tokenizer        │  어휘 분석
+└────────┬─────────┘
+         │
     ▼
-Lexer → Tokens
-    │
+┌──────────────────┐
+│ Parser           │  구문 분석 → AST
+└────────┬─────────┘
+         │
     ▼
-Parser → AST
-    │
+┌──────────────────┐
+│ Validator        │  Props/Style/Markup 검증
+└────────┬─────────┘
+         │
     ▼
-Type Checker
-    │
-    ▼
-IR Generator
-    │
-    ▼
-┌───────┬────────┬──────────┬──────┐
-│  GCC  │  NASM  │ ELF 직접 │ WASM │
-│(C코드)│(x86-64)│ (바이너리)│      │
-└───────┴────────┴──────────┴──────┘
+┌──────────────────────────────────┐
+│ Code Generators                  │
+├──────────────┬──────────┬────────┤
+│ CSS Compiler │ JS Gen   │ HTML   │
+└──────┬───────┴───┬──────┴───┬────┘
+       │           │         │
+       ▼           ▼         ▼
+   *.css       *.js      *.html
 ```
 
 ### 디렉토리 구조
 
 ```
-src/
-├── lexer/              # 토크나이저
-├── parser/             # 파서 + AST
-│   ├── parser.ts       # @lint 어노테이션 파싱 포함
-│   └── ast.ts          # LintConfig 타입 포함
-├── linter/             # Native-Linter (v2.7.0 신규)
-│   ├── lint-gate.ts    # 메인 엔진
-│   └── rules/
-│       ├── no-unused.ts
-│       ├── no-shadowing.ts
-│       └── strict-pointers.ts
-├── analyzer/           # 의미 분석 + 타입 추론 (40+ 모듈)
-├── codegen/            # 코드 생성기 (C, NASM, WASM, LLVM)
-├── compiler/           # 컴파일러 코어
-├── stdlib/             # 표준 라이브러리
-│   ├── insight-builtins.ts  # 실시간 모니터링 함수
-│   └── ...
-├── runtime/
-│   └── insight-engine.ts    # Self-Monitoring 런타임
-├── self-host/          # 셀프호스팅 .free 소스
-│   ├── compiler.free   # @lint 적용 (셀프호스팅 증명)
-│   ├── parser.free
-│   └── lexer.free
-├── vm.ts               # 가상 머신
-└── stdlib-builtins.ts  # 빌트인 함수 1,340+개
-                        #   └── Native-Graph: graph_schema_define/resolver_add/
-                        #       graph_server_start/graph_execute/graph_server_stop
+freelang-light/
+├── src/
+│   ├── parser.js              (600줄)  파서 + 토크나이저
+│   ├── expression-evaluator.js (300줄) 표현식 평가
+│   ├── markup-processor.js     (250줄) if/for 렌더링
+│   ├── indexer.js             (400줄) 자동 인덱싱
+│   ├── search-api.js          (300줄) REST API 서버
+│   ├── bundler.js             (400줄) CSS/JS/HTML 번들링
+│   ├── cli.js                 (500줄) CLI 도구
+│   ├── css-compiler.js        (100줄) 스타일 컴파일러
+│   ├── js-compiler.js         (100줄) JS 생성기
+│   ├── html-generator.js      (100줄) HTML 생성기
+│   └── test-*.js              (600줄) 테스트 슈트
+│
+├── examples/
+│   ├── button.free            기본 버튼 컴포넌트
+│   ├── card.free              카드 컴포넌트
+│   └── list.free              리스트 컴포넌트
+│
+├── docs/
+│   ├── SPEC.md                언어 스펙
+│   ├── API_REFERENCE.md       API 문서
+│   └── DEPLOYMENT.md          배포 가이드
+│
+└── README.md                  이 파일
 ```
 
 ---
 
-## 언어 레퍼런스
+## 📊 언어 스펙
 
-### 기본 문법
+### Component 블록
 
 ```free
-// 변수
-let x = 10
-let name: string = "FreeLang"
-
-// 함수
-fn add(a: i64, b: i64) -> i64 {
-  return a + b
-}
-
-// 제어 흐름
-if x > 5 {
-  println("크다")
-} else {
-  println("작다")
-}
-
-for item in arr {
-  println(item)
-}
-
-// 패턴 매칭
-match value {
-  0 => println("zero"),
-  1 => println("one"),
-  _ => println("other"),
-}
-
-// 비동기
-async fn fetch(url: string) -> string {
-  let res = await http_get(url)
-  return res
-}
-
-// 예외 처리
-try {
-  let data = file_read("data.txt")
-} catch err {
-  println("에러: " + err)
-} finally {
-  println("완료")
+component ComponentName {
+  props { ... }
+  style { ... }
+  markup { ... }
 }
 ```
 
-### Native-Linter 어노테이션
+### Props 정의
 
 ```free
-// 파일 최상단에 선언
-@lint(no_unused: error, shadowing_check: warn, strict_pointers: true)
-
-// 이후 모든 선언에 자동 적용
-fn main() {
-  let x = 1       // 사용하면 OK
-  let y = 2       // 사용 안 하면 → error: 'y' is never used
-  return x
+props {
+  title: string,              // 필수
+  count: number = 0,          // 기본값 있음
+  items: array = [],          // 배열
+  active: bool = false        // 불린
 }
 ```
 
-### 표준 라이브러리 (1,333+ 함수)
+### Style 블록
 
+```free
+style {
+  .classname {
+    property: value;
+  }
+
+  .classname:hover {
+    property: value;
+  }
+}
 ```
-수학:        sin, cos, sqrt, pow, log, round, ceil, floor, abs
-문자열:      strlen, trim, split, join, replace, substr, indexOf
-배열:        push, pop, map, filter, reduce, sort, slice, length
-파일 I/O:   file_read, file_write, file_exists, file_delete, dir_list
-네트워크:   http_get, http_post, tcp_listen, tcp_connect, ws_send
-데이터베이스: db_open, db_query, db_exec, db_one, db_close
-암호화:     sha256, md5, bcrypt, aes_encrypt, base64_encode
-시간:       date_now, date_format, sleep, timestamp
-압축:       compress_deflate, decompress_inflate, compress_gzip
-모니터링:   @monitor, insight_cpu, insight_mem, insight_rps
-그래프:     graph_schema_define, graph_resolver_add, graph_server_start, graph_execute
+
+### Markup 블록
+
+```free
+markup {
+  // 기본 HTML
+  <div>{title}</div>
+
+  // Props 바인딩
+  <span>{content}</span>
+
+  // 조건부 렌더링
+  if condition {
+    <p>show this</p>
+  }
+
+  // 반복
+  for item in items {
+    <li>{item}</li>
+  }
+}
 ```
 
 ---
 
-## 외부 의존성 대체 현황
-
-| 외부 패키지 | FreeLang 대체 | 상태 |
-|-------------|--------------|------|
-| `eslint` | Native-Linter (`@lint` 어노테이션) | ✅ 완료 |
-| `apollo-server` / `graphql` | Native-Graph | ✅ 완료 |
-| `pm2` / `cluster` | MOSS-Kernel-Runner | ✅ 완료 |
-| `swagger-ui` / `express-openapi` | MOSS-Autodoc | ✅ 완료 |
-| `nodemailer` | MOSS-Mail-Core (SMTP FSM) | ✅ 완료 |
-| `zlib` / `pako` | MOSS-Compressor (DEFLATE+GZIP) | ✅ 완료 |
-| `sharp` / `jimp` | Vector-Vision (SIMD 이미지 처리) | ✅ 완료 |
-| `helmet` / `bcrypt` | MOSS-Security 내장 | ✅ 완료 |
-
----
-
-## 빌드 및 테스트
+## 🧪 테스트 현황
 
 ```bash
-# TypeScript 컴파일 (에러 0개 보장)
-npm run build:ts
-
-# 전체 테스트
+# 전체 테스트 실행
 npm test
 
-# 린터 직접 실행
-npx ts-node -e "
-import { runLintGate, formatLintResult } from './src/linter/lint-gate';
-// ...
-"
+# 특정 테스트만 실행
+npm test -- --grep "Parser"
 
-# 특정 .free 파일 실행
-npx ts-node src/cli/index.ts examples/hello.free
+# 커버리지 보고서
+npm run test:coverage
 ```
 
-### 테스트 현황
+### 테스트 결과
 
-```
-단위 테스트:       88/88   ✅
-통합 테스트:       45/45   ✅
-성능 테스트:       12/12   ✅
-E2E 테스트:        31/31   ✅
-──────────────────────────────
-총합:             176/176  ✅ (100%)
-```
+| 카테고리 | 개수 | 상태 |
+|---------|------|------|
+| Unit Tests | 10 | ✅ PASS |
+| Integration Tests | 8 | ✅ PASS |
+| E2E Tests | 4 | ✅ PASS |
+| **총합** | **22** | **✅ 100%** |
 
 ---
 
-## 버전 이력
+## 🚢 배포
 
-```
-v2.0.0  기본 컴파일러, 50+ 함수
-v2.1.0  Web Framework, 400+ 함수
-v2.2.0  AI 자동화 (자가 최적화/치유/증식)
-v2.3.0  성능 최적화 + DB 드라이버 (SQLite/MySQL/PostgreSQL/Redis)
-v2.4.0  비동기(async/await), 패턴 매칭, Generic<T>
-v2.5.0  SIMD 이미지 처리(Vector-Vision), MOSS-Style
-v2.6.0  Level 3 DB 완성, KPM-Linker, MOSS-Kernel-Runner
-v2.7.0  Native-Linter (ESLint 대체), Native-Graph (Apollo 대체),
-        MOSS-Compressor (zlib 대체), Self-Monitoring Runtime
-        외부 의존성 0% 달성
-v2.8.0  Native-Expect (Chai 대체): expect().to.be.equal() 언어 정규 문법 편입
-        Parser + IR Generator 확장, Zero-cost 릴리즈, Self-Hosting 증명
+### 개발 환경
+
+```bash
+npm install
+npm run dev          # 개발 서버 시작
+npm run build        # 빌드
 ```
 
----
+### 프로덕션 배포
 
-## 통계
+```bash
+# 번들 생성
+npm run bundle
 
-```
-총 코드:          15,700+ 줄
-표준 함수:        1,340+ 개  (+5 Native-Graph, +2 Insight)
-언어 키워드:      45개  (+1: expect)
-어서션 종류:      5개 (equal / notEqual / true / false / exists)
-린터 규칙:        3개 (no_unused / shadowing_check / strict_pointers)
-대체된 npm 패키지: 10개 (ESLint/Apollo/PM2/Swagger/nodemailer/zlib/sharp/helmet/chai/**Husky**)
-커밋:             475+개
-외부 의존성:      0%
+# 배포
+npm run deploy
 ```
 
----
+### Docker 배포
 
-### 🔒 Native Guard Hook (v2.9) — Husky 완전 대체
-
-- **Zero-Dependency Hooks**: `.git/hooks` 미사용. `git config core.hooksPath` + `~/.freelang-gate/hooks/` 방식
-- **Compiler-Level Enforcement**: `@git_hook(event: .pre_commit)` 어노테이션을 컴파일러가 감지 → 자동 Gate 등록
-- **Binary-Gate Signal**: 훅 함수 실패 시 `process.exit(1)` → Git 커밋/푸시 바이너리 수준 차단
-- **VCS Stdlib**: `vcs_lint()`, `vcs_test()`, `vcs_check_secrets()`, `git_staged_files()` 내장
-
-```
-# FreeLang 문법으로 커밋 규칙 정의
-@git_hook(event: .pre_commit)
-fn validate_before_save() {
-    vcs_check_secrets()   // 하드코딩 시크릿 감지 → 커밋 차단
-    vcs_lint()            // TypeScript/ESLint 검사
-    vcs_test()            // 테스트 실행
-}
-
-@git_hook(event: .pre_push)
-fn full_test_before_push() {
-    if git_branch() == "main" {
-        vcs_exit_error("main 직접 push 금지. PR을 사용하세요.")
-    }
-    vcs_test()
-}
+```dockerfile
+FROM node:18-alpine
+WORKDIR /app
+COPY . .
+RUN npm ci
+RUN npm run build
+EXPOSE 4002
+CMD ["npm", "start"]
 ```
 
 ```bash
-# 설치 (Husky 설치 없이)
-freelang gate install commit-gate.free
-
-# 상태 확인
-freelang gate status
-
-# 훅 수동 실행
-freelang gate run pre-commit
+docker build -t freelang-light .
+docker run -p 4002:4002 freelang-light
 ```
 
 ---
 
-## 저장소
+## 📈 개발 로드맵
 
-- **Gogs**: https://gogs.dclub.kr/kim/v2-freelang-ai
-- **Issues**: https://gogs.dclub.kr/kim/v2-freelang-ai/issues
+### Phase 5 (계획)
+- [ ] Vue/React 호환성
+- [ ] Tailwind CSS 통합
+- [ ] TypeScript 지원
+
+### Phase 6 (계획)
+- [ ] 상태 관리 (State)
+- [ ] 라우팅 (Routing)
+- [ ] 폼 검증
 
 ---
 
-## 라이선스
+## 💬 커뮤니티
 
-MIT License © 2026
+- 📧 Email: support@freelang.io
+- 🐦 Twitter: [@freelang_io](https://twitter.com/freelang_io)
+- 💬 Discussions: [GitHub Discussions](https://github.com/kimjindol2025/freelang-light/discussions)
 
 ---
 
-**현재 버전**: v2.9.0
-**최종 업데이트**: 2026-03-08
-**외부 의존성**: 0%
+## 🤝 기여
+
+FreeLang Light 프로젝트에 기여하고 싶으신가요?
+
+### 기여 방법
+
+1. **Fork** 저장소
+   ```bash
+   git clone https://github.com/YOUR-USERNAME/freelang-light.git
+   cd freelang-light
+   ```
+
+2. **Feature 브랜치** 만들기
+   ```bash
+   git checkout -b feature/your-feature
+   ```
+
+3. **커밋** 및 **푸시**
+   ```bash
+   git commit -m "✨ Add: your feature"
+   git push origin feature/your-feature
+   ```
+
+4. **Pull Request** 생성
+   - 명확한 설명 작성
+   - 테스트 코드 포함
+   - 문서 업데이트
+
+### 개발자 가이드
+
+- [CONTRIBUTING.md](./CONTRIBUTING.md) - 기여 규칙
+- [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) - 행동 수칙
+- [DEV_SETUP.md](./docs/DEV_SETUP.md) - 개발 환경 설정
+
+---
+
+## 📝 라이선스
+
+이 프로젝트는 **MIT License** 하에 배포됩니다.
+
+```
+MIT License © 2026 FreeLang Contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software...
+```
+
+자세한 내용은 [LICENSE](./LICENSE) 파일을 참고하세요.
+
+---
+
+## 👥 저자 및 기여자
+
+<table>
+  <tr>
+    <td align="center">
+      <a href="https://github.com/kimjindol2025">
+        <img src="https://avatars.githubusercontent.com/u/..." alt="Kim Jindol" width="60px;" /><br />
+        <b>Kim Jindol</b><br />
+        🎨 Creator & Lead Developer
+      </a>
+    </td>
+    <td align="center">
+      <a href="https://github.com/contributors">
+        <img src="https://avatars.githubusercontent.com/u/..." alt="Contributors" width="60px;" /><br />
+        <b>Contributors</b><br />
+        🙌 Open Source Community
+      </a>
+    </td>
+  </tr>
+</table>
+
+---
+
+## 📞 연락처 및 지원
+
+- 🐛 **버그 리포트**: [Issues](https://github.com/kimjindol2025/freelang-light/issues)
+- 💡 **기능 제안**: [Discussions](https://github.com/kimjindol2025/freelang-light/discussions)
+- 📚 **문서**: [Wiki](https://github.com/kimjindol2025/freelang-light/wiki)
+- 🌐 **웹사이트**: [freelang.io](https://freelang.io)
+
+---
+
+<div align="center">
+
+**⭐ 이 프로젝트가 도움이 되었다면 별(Star)을 눌러주세요!**
+
+Made with ❤️ by the FreeLang Team
+
+</div>
