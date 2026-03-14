@@ -1,0 +1,436 @@
+/**
+ * Phase 11.3: SQLite Query Builder
+ *
+ * Type-safe SQL query construction with parameter binding
+ * Written in FreeLang for production use
+ */
+
+// Query operation types
+enum QueryType {
+  SELECT
+  INSERT
+  UPDATE
+  DELETE
+}
+
+// SQL comparison operators
+enum ComparisonOp {
+  EQ       // =
+  NEQ      // !=
+  GT       // >
+  GTE      // >=
+  LT       // <
+  LTE      // <=
+  LIKE     // LIKE
+  IN       // IN
+  BETWEEN  // BETWEEN
+}
+
+// Logical operators
+enum LogicalOp {
+  AND
+  OR
+}
+
+// Condition for WHERE clause
+type Condition = {
+  column: string
+  operator: ComparisonOp
+  value: any
+  logicalOp: LogicalOp
+}
+
+// ORDER BY clause
+type OrderClause = {
+  column: string
+  ascending: boolean
+}
+
+// SQL Query object
+type Query = {
+  type: QueryType
+  table: string
+  columns: [string]
+  conditions: [Condition]
+  values: [any]
+  orderByClauses: [OrderClause]
+  limit: i32
+  offset: i32
+  distinct: boolean
+}
+
+// Query Builder for fluent SQL construction
+type QueryBuilder = {
+  query: Query
+}
+
+/**
+ * Create new SELECT query builder
+ */
+fn selectQuery(columns: [string]) -> QueryBuilder {
+  let query: Query = {
+    type: QueryType.SELECT,
+    table: "",
+    columns: columns,
+    conditions: [],
+    values: [],
+    orderByClauses: [],
+    limit: 0,
+    offset: 0,
+    distinct: false
+  }
+
+  return {
+    query: query
+  }
+}
+
+/**
+ * Set table for query
+ */
+fn from(builder: QueryBuilder, table: string) -> QueryBuilder {
+  builder.query.table = table
+  return builder
+}
+
+/**
+ * Add WHERE condition (equality)
+ */
+fn where(builder: QueryBuilder, column: string, value: any) -> QueryBuilder {
+  let condition: Condition = {
+    column: column,
+    operator: ComparisonOp.EQ,
+    value: value,
+    logicalOp: LogicalOp.AND
+  }
+
+  builder.query.conditions.push(condition)
+  return builder
+}
+
+/**
+ * Add WHERE condition with operator
+ */
+fn whereOp(
+  builder: QueryBuilder,
+  column: string,
+  op: ComparisonOp,
+  value: any
+) -> QueryBuilder {
+  let condition: Condition = {
+    column: column,
+    operator: op,
+    value: value,
+    logicalOp: LogicalOp.AND
+  }
+
+  builder.query.conditions.push(condition)
+  return builder
+}
+
+/**
+ * Add OR condition
+ */
+fn orWhere(builder: QueryBuilder, column: string, value: any) -> QueryBuilder {
+  let condition: Condition = {
+    column: column,
+    operator: ComparisonOp.EQ,
+    value: value,
+    logicalOp: LogicalOp.OR
+  }
+
+  builder.query.conditions.push(condition)
+  return builder
+}
+
+/**
+ * Add ORDER BY clause
+ */
+fn orderBy(builder: QueryBuilder, column: string, ascending: boolean) -> QueryBuilder {
+  let order: OrderClause = {
+    column: column,
+    ascending: ascending
+  }
+
+  builder.query.orderByClauses.push(order)
+  return builder
+}
+
+/**
+ * Add LIMIT clause
+ */
+fn limit(builder: QueryBuilder, limitValue: i32) -> QueryBuilder {
+  builder.query.limit = limitValue
+  return builder
+}
+
+/**
+ * Add OFFSET clause
+ */
+fn offset(builder: QueryBuilder, offsetValue: i32) -> QueryBuilder {
+  builder.query.offset = offsetValue
+  return builder
+}
+
+/**
+ * Add DISTINCT keyword
+ */
+fn distinct(builder: QueryBuilder) -> QueryBuilder {
+  builder.query.distinct = true
+  return builder
+}
+
+/**
+ * Build SQL string from query
+ */
+fn buildSQL(builder: QueryBuilder) -> string {
+  let sql: string = ""
+  let query: Query = builder.query
+
+  match query.type {
+    case QueryType.SELECT => {
+      sql = "SELECT "
+
+      if query.distinct {
+        sql = sql + "DISTINCT "
+      }
+
+      // Add columns
+      if query.columns.length > 0 {
+        for i = 0; i < query.columns.length; i = i + 1 {
+          if i > 0 {
+            sql = sql + ", "
+          }
+          sql = sql + query.columns[i]
+        }
+      } else {
+        sql = sql + "*"
+      }
+
+      // Add FROM clause
+      sql = sql + " FROM " + query.table
+
+      // Add WHERE clause
+      if query.conditions.length > 0 {
+        sql = sql + " WHERE "
+
+        for i = 0; i < query.conditions.length; i = i + 1 {
+          let cond: Condition = query.conditions[i]
+
+          if i > 0 {
+            match cond.logicalOp {
+              case LogicalOp.AND => {
+                sql = sql + " AND "
+              }
+              case LogicalOp.OR => {
+                sql = sql + " OR "
+              }
+            }
+          }
+
+          sql = sql + cond.column
+
+          match cond.operator {
+            case ComparisonOp.EQ => sql = sql + " = ?"
+            case ComparisonOp.NEQ => sql = sql + " != ?"
+            case ComparisonOp.GT => sql = sql + " > ?"
+            case ComparisonOp.GTE => sql = sql + " >= ?"
+            case ComparisonOp.LT => sql = sql + " < ?"
+            case ComparisonOp.LTE => sql = sql + " <= ?"
+            case ComparisonOp.LIKE => sql = sql + " LIKE ?"
+            case ComparisonOp.IN => sql = sql + " IN (?)"
+            case ComparisonOp.BETWEEN => sql = sql + " BETWEEN ? AND ?"
+          }
+        }
+      }
+
+      // Add ORDER BY clause
+      if query.orderByClauses.length > 0 {
+        sql = sql + " ORDER BY "
+
+        for i = 0; i < query.orderByClauses.length; i = i + 1 {
+          if i > 0 {
+            sql = sql + ", "
+          }
+
+          let order: OrderClause = query.orderByClauses[i]
+          sql = sql + order.column
+
+          if !order.ascending {
+            sql = sql + " DESC"
+          }
+        }
+      }
+
+      // Add LIMIT clause
+      if query.limit > 0 {
+        sql = sql + " LIMIT " + query.limit.toString()
+      }
+
+      // Add OFFSET clause
+      if query.offset > 0 {
+        sql = sql + " OFFSET " + query.offset.toString()
+      }
+    }
+
+    case QueryType.INSERT => {
+      sql = "INSERT INTO " + query.table
+
+      if query.columns.length > 0 {
+        sql = sql + " ("
+
+        for i = 0; i < query.columns.length; i = i + 1 {
+          if i > 0 {
+            sql = sql + ", "
+          }
+          sql = sql + query.columns[i]
+        }
+
+        sql = sql + ") VALUES ("
+
+        for i = 0; i < query.columns.length; i = i + 1 {
+          if i > 0 {
+            sql = sql + ", "
+          }
+          sql = sql + "?"
+        }
+
+        sql = sql + ")"
+      }
+    }
+
+    case QueryType.UPDATE => {
+      sql = "UPDATE " + query.table + " SET "
+
+      if query.columns.length > 0 {
+        for i = 0; i < query.columns.length; i = i + 1 {
+          if i > 0 {
+            sql = sql + ", "
+          }
+          sql = sql + query.columns[i] + " = ?"
+        }
+      }
+
+      // Add WHERE clause
+      if query.conditions.length > 0 {
+        sql = sql + " WHERE "
+
+        for i = 0; i < query.conditions.length; i = i + 1 {
+          let cond: Condition = query.conditions[i]
+
+          if i > 0 {
+            match cond.logicalOp {
+              case LogicalOp.AND => sql = sql + " AND "
+              case LogicalOp.OR => sql = sql + " OR "
+            }
+          }
+
+          sql = sql + cond.column + " = ?"
+        }
+      }
+    }
+
+    case QueryType.DELETE => {
+      sql = "DELETE FROM " + query.table
+
+      // Add WHERE clause
+      if query.conditions.length > 0 {
+        sql = sql + " WHERE "
+
+        for i = 0; i < query.conditions.length; i = i + 1 {
+          let cond: Condition = query.conditions[i]
+
+          if i > 0 {
+            match cond.logicalOp {
+              case LogicalOp.AND => sql = sql + " AND "
+              case LogicalOp.OR => sql = sql + " OR "
+            }
+          }
+
+          sql = sql + cond.column + " = ?"
+        }
+      }
+    }
+  }
+
+  return sql
+}
+
+/**
+ * Get parameter values in order
+ */
+fn getParameters(builder: QueryBuilder) -> [any] {
+  let params: [any] = []
+  let query: Query = builder.query
+
+  // Collect parameters from conditions
+  for i = 0; i < query.conditions.length; i = i + 1 {
+    let cond: Condition = query.conditions[i]
+    params.push(cond.value)
+  }
+
+  // Collect parameters from values (INSERT/UPDATE)
+  for i = 0; i < query.values.length; i = i + 1 {
+    params.push(query.values[i])
+  }
+
+  return params
+}
+
+/**
+ * Query statistics for monitoring
+ */
+type QueryStats = {
+  queryType: string
+  columnCount: i32
+  conditionCount: i32
+  sqlLength: i32
+  parameterCount: i32
+}
+
+/**
+ * Get query statistics
+ */
+fn getStats(builder: QueryBuilder) -> QueryStats {
+  let query: Query = builder.query
+  let sql: string = buildSQL(builder)
+  let params: [any] = getParameters(builder)
+
+  let queryTypeStr: string = match query.type {
+    case QueryType.SELECT => "SELECT"
+    case QueryType.INSERT => "INSERT"
+    case QueryType.UPDATE => "UPDATE"
+    case QueryType.DELETE => "DELETE"
+  }
+
+  return {
+    queryType: queryTypeStr,
+    columnCount: query.columns.length,
+    conditionCount: query.conditions.length,
+    sqlLength: sql.length,
+    parameterCount: params.length
+  }
+}
+
+export {
+  selectQuery,
+  from,
+  where,
+  whereOp,
+  orWhere,
+  orderBy,
+  limit,
+  offset,
+  distinct,
+  buildSQL,
+  getParameters,
+  getStats,
+  QueryType,
+  ComparisonOp,
+  LogicalOp,
+  Condition,
+  OrderClause,
+  Query,
+  QueryBuilder,
+  QueryStats
+}

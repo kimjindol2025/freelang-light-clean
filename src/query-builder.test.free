@@ -1,0 +1,397 @@
+/**
+ * Phase 11.3: SQLite Query Builder Tests
+ *
+ * Test suite for Query Builder in FreeLang
+ */
+
+import {
+  selectQuery,
+  from,
+  where,
+  whereOp,
+  orWhere,
+  orderBy,
+  limit,
+  offset,
+  distinct,
+  buildSQL,
+  getParameters,
+  getStats,
+  QueryType,
+  ComparisonOp,
+  LogicalOp
+} from "./query-builder"
+
+// Test utility: assert equality
+fn assertEqual(actual: any, expected: any, message: string) {
+  if actual != expected {
+    print("❌ FAIL: " + message)
+    print("  Expected: " + expected.toString())
+    print("  Actual:   " + actual.toString())
+  } else {
+    print("✅ PASS: " + message)
+  }
+}
+
+// Test 1: Simple SELECT query
+fn testSimpleSelect() {
+  print("\n📋 Test: Simple SELECT Query")
+
+  let builder = selectQuery(["id", "name", "email"])
+  let builder2 = from(builder, "users")
+  let sql = buildSQL(builder2)
+
+  assertEqual(
+    sql.includes("SELECT id, name, email"),
+    true,
+    "Should have SELECT columns"
+  )
+
+  assertEqual(
+    sql.includes("FROM users"),
+    true,
+    "Should have FROM table"
+  )
+}
+
+// Test 2: SELECT with WHERE
+fn testSelectWithWhere() {
+  print("\n📋 Test: SELECT with WHERE")
+
+  let builder = selectQuery(["id", "name"])
+  let builder2 = from(builder, "users")
+  let builder3 = where(builder2, "age", 18)
+  let sql = buildSQL(builder3)
+
+  assertEqual(
+    sql.includes("WHERE age = ?"),
+    true,
+    "Should have WHERE clause with parameter"
+  )
+
+  let params = getParameters(builder3)
+  assertEqual(params.length, 1, "Should have 1 parameter")
+}
+
+// Test 3: SELECT with multiple conditions
+fn testSelectMultipleConditions() {
+  print("\n📋 Test: SELECT with Multiple Conditions")
+
+  let builder = selectQuery(["id", "name"])
+  let builder2 = from(builder, "users")
+  let builder3 = where(builder2, "age", 18)
+  let builder4 = orWhere(builder3, "status", "active")
+  let sql = buildSQL(builder4)
+
+  assertEqual(
+    sql.includes("WHERE age = ?"),
+    true,
+    "Should have first WHERE condition"
+  )
+
+  assertEqual(
+    sql.includes("OR status = ?"),
+    true,
+    "Should have OR condition"
+  )
+
+  let params = getParameters(builder4)
+  assertEqual(params.length, 2, "Should have 2 parameters")
+}
+
+// Test 4: SELECT with ORDER BY
+fn testSelectWithOrderBy() {
+  print("\n📋 Test: SELECT with ORDER BY")
+
+  let builder = selectQuery(["id", "name"])
+  let builder2 = from(builder, "users")
+  let builder3 = orderBy(builder2, "name", true)
+  let sql = buildSQL(builder3)
+
+  assertEqual(
+    sql.includes("ORDER BY name"),
+    true,
+    "Should have ORDER BY clause"
+  )
+
+  assertEqual(
+    sql.includes("DESC"),
+    false,
+    "Should be ascending (no DESC)"
+  )
+}
+
+// Test 5: SELECT with LIMIT
+fn testSelectWithLimit() {
+  print("\n📋 Test: SELECT with LIMIT")
+
+  let builder = selectQuery(["id", "name"])
+  let builder2 = from(builder, "users")
+  let builder3 = limit(builder2, 10)
+  let sql = buildSQL(builder3)
+
+  assertEqual(
+    sql.includes("LIMIT 10"),
+    true,
+    "Should have LIMIT clause"
+  )
+}
+
+// Test 6: SELECT with DISTINCT
+fn testSelectWithDistinct() {
+  print("\n📋 Test: SELECT with DISTINCT")
+
+  let builder = selectQuery(["category"])
+  let builder2 = from(builder, "products")
+  let builder3 = distinct(builder2)
+  let sql = buildSQL(builder3)
+
+  assertEqual(
+    sql.includes("DISTINCT"),
+    true,
+    "Should have DISTINCT keyword"
+  )
+}
+
+// Test 7: SELECT all columns (*)
+fn testSelectAllColumns() {
+  print("\n📋 Test: SELECT All Columns")
+
+  let builder = selectQuery([])
+  let builder2 = from(builder, "users")
+  let sql = buildSQL(builder2)
+
+  assertEqual(
+    sql.includes("SELECT *"),
+    true,
+    "Should select all columns with *"
+  )
+}
+
+// Test 8: Comparison operators
+fn testComparisonOperators() {
+  print("\n📋 Test: Comparison Operators")
+
+  let builder = selectQuery(["id"])
+  let builder2 = from(builder, "products")
+  let builder3 = whereOp(builder2, "price", ComparisonOp.GT, 100)
+  let sql = buildSQL(builder3)
+
+  assertEqual(
+    sql.includes("price > ?"),
+    true,
+    "Should use > operator"
+  )
+
+  // Test GTE
+  let builder4 = selectQuery(["id"])
+  let builder5 = from(builder4, "products")
+  let builder6 = whereOp(builder5, "stock", ComparisonOp.GTE, 50)
+  let sql2 = buildSQL(builder6)
+
+  assertEqual(
+    sql2.includes("stock >= ?"),
+    true,
+    "Should use >= operator"
+  )
+}
+
+// Test 9: LIKE operator
+fn testLikeOperator() {
+  print("\n📋 Test: LIKE Operator")
+
+  let builder = selectQuery(["id", "name"])
+  let builder2 = from(builder, "users")
+  let builder3 = whereOp(builder2, "name", ComparisonOp.LIKE, "%John%")
+  let sql = buildSQL(builder3)
+
+  assertEqual(
+    sql.includes("name LIKE ?"),
+    true,
+    "Should use LIKE operator"
+  )
+}
+
+// Test 10: Query statistics
+fn testQueryStats() {
+  print("\n📋 Test: Query Statistics")
+
+  let builder = selectQuery(["id", "name", "email"])
+  let builder2 = from(builder, "users")
+  let builder3 = where(builder2, "active", true)
+  let stats = getStats(builder3)
+
+  assertEqual(stats.queryType, "SELECT", "Should be SELECT type")
+  assertEqual(stats.columnCount, 3, "Should have 3 columns")
+  assertEqual(stats.conditionCount, 1, "Should have 1 condition")
+  assertEqual(stats.parameterCount, 1, "Should have 1 parameter")
+}
+
+// Test 11: INSERT query
+fn testInsertQuery() {
+  print("\n📋 Test: INSERT Query")
+
+  let builder = selectQuery(["name", "email"])
+  builder.query.type = QueryType.INSERT
+  builder.query.table = "users"
+  builder.query.values = ["John Doe", "john@example.com"]
+
+  let sql = buildSQL(builder)
+
+  assertEqual(
+    sql.includes("INSERT INTO users"),
+    true,
+    "Should have INSERT INTO"
+  )
+
+  assertEqual(
+    sql.includes("VALUES"),
+    true,
+    "Should have VALUES clause"
+  )
+}
+
+// Test 12: UPDATE query
+fn testUpdateQuery() {
+  print("\n📋 Test: UPDATE Query")
+
+  let builder = selectQuery(["email"])
+  builder.query.type = QueryType.UPDATE
+  builder.query.table = "users"
+  builder.query.values = ["new@example.com"]
+
+  let builder2 = where(builder, "id", 1)
+  let sql = buildSQL(builder2)
+
+  assertEqual(
+    sql.includes("UPDATE users SET"),
+    true,
+    "Should have UPDATE SET"
+  )
+
+  assertEqual(
+    sql.includes("WHERE"),
+    true,
+    "Should have WHERE clause"
+  )
+}
+
+// Test 13: DELETE query
+fn testDeleteQuery() {
+  print("\n📋 Test: DELETE Query")
+
+  let builder = selectQuery([])
+  builder.query.type = QueryType.DELETE
+  builder.query.table = "users"
+
+  let builder2 = where(builder, "id", 1)
+  let sql = buildSQL(builder2)
+
+  assertEqual(
+    sql.includes("DELETE FROM users"),
+    true,
+    "Should have DELETE FROM"
+  )
+
+  assertEqual(
+    sql.includes("WHERE"),
+    true,
+    "Should have WHERE clause"
+  )
+}
+
+// Test 14: Chained method calls
+fn testMethodChaining() {
+  print("\n📋 Test: Method Chaining")
+
+  let builder = selectQuery(["id", "name"])
+  let builder2 = from(builder, "users")
+  let builder3 = where(builder2, "age", 18)
+  let builder4 = orderBy(builder3, "name", true)
+  let builder5 = limit(builder4, 10)
+
+  let sql = buildSQL(builder5)
+
+  assertEqual(
+    sql.includes("SELECT id, name FROM users WHERE age = ? ORDER BY name LIMIT 10"),
+    true,
+    "Should have chained query structure"
+  )
+}
+
+// Test 15: Complex query with all features
+fn testComplexQuery() {
+  print("\n📋 Test: Complex Query")
+
+  let builder = selectQuery(["id", "name", "email"])
+  let b2 = from(builder, "users")
+  let b3 = distinct(b2)
+  let b4 = where(b3, "status", "active")
+  let b5 = orWhere(b4, "vip", true)
+  let b6 = whereOp(b5, "created_at", ComparisonOp.GT, "2020-01-01")
+  let b7 = orderBy(b6, "created_at", false)
+  let b8 = limit(b7, 20)
+  let b9 = offset(b8, 10)
+
+  let sql = buildSQL(b9)
+
+  assertEqual(
+    sql.includes("DISTINCT"),
+    true,
+    "Should have DISTINCT"
+  )
+
+  assertEqual(
+    sql.includes("WHERE"),
+    true,
+    "Should have WHERE"
+  )
+
+  assertEqual(
+    sql.includes("ORDER BY created_at DESC"),
+    true,
+    "Should have ORDER BY DESC"
+  )
+
+  assertEqual(
+    sql.includes("LIMIT 20"),
+    true,
+    "Should have LIMIT"
+  )
+
+  assertEqual(
+    sql.includes("OFFSET 10"),
+    true,
+    "Should have OFFSET"
+  )
+}
+
+// Run all tests
+fn runAllTests() {
+  print("\n╔════════════════════════════════════════════╗")
+  print("║  Phase 11.3: Query Builder Test Suite     ║")
+  print("╚════════════════════════════════════════════╝")
+
+  testSimpleSelect()
+  testSelectWithWhere()
+  testSelectMultipleConditions()
+  testSelectWithOrderBy()
+  testSelectWithLimit()
+  testSelectWithDistinct()
+  testSelectAllColumns()
+  testComparisonOperators()
+  testLikeOperator()
+  testQueryStats()
+  testInsertQuery()
+  testUpdateQuery()
+  testDeleteQuery()
+  testMethodChaining()
+  testComplexQuery()
+
+  print("\n╔════════════════════════════════════════════╗")
+  print("║  ✅ All tests completed!                  ║")
+  print("╚════════════════════════════════════════════╝\n")
+}
+
+// Execute tests
+runAllTests()
