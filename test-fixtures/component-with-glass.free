@@ -1,0 +1,22 @@
+// Phase 10.6: E2E Test File - Glassmorphism Component
+
+component GlassCard {
+  @glass {
+    background: rgba(255,255,255,0.1)
+    backdropFilter: blur(10px)
+    borderRadius: 12px
+    border: 1px solid rgba(255,255,255,0.2)
+  }
+
+  @glass hoveredState {
+    background: rgba(255,255,255,0.15)
+    backdropFilter: blur(15px)
+  }
+
+  fn render() {
+    return <div class="glass-card">
+      <h3>Glass Effect Card</h3>
+      <p>Blurred background with transparency</p>
+    </div>
+  }
+}

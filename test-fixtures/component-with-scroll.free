@@ -1,0 +1,22 @@
+// Phase 10.6: E2E Test File - Scroll Trigger Component
+
+component ScrollReveal {
+  @scroll {
+    trigger: top
+    start: top center
+    end: bottom center
+    scrub: 1
+  }
+
+  @scroll fadeInOnScroll {
+    trigger: .reveal-item
+    animation: fadeIn
+    duration: 800ms
+  }
+
+  fn render() {
+    return <section class="scroll-section">
+      <div class="reveal-item">Reveal on scroll</div>
+    </section>
+  }
+}

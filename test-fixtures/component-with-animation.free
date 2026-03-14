@@ -1,0 +1,19 @@
+// Phase 10.6: E2E Test File - Animation Component
+
+component AnimatedButton {
+  @animation fadeIn {
+    duration: 300
+    opacity: 0 → 1
+    easing: ease-in-out
+  }
+
+  @animation slideIn {
+    duration: 500
+    transform: translateX(-100px) → translateX(0)
+    delay: 100
+  }
+
+  fn render() {
+    return <button class="btn-animated">Click me</button>
+  }
+}

@@ -1,0 +1,23 @@
+// Phase 10.6: E2E Test File - 3D Transform Component
+
+component Card3D {
+  @3d {
+    perspective: 1000px
+    rotateX: 0deg
+    rotateY: 0deg
+    rotateZ: 0deg
+  }
+
+  @3d onHover {
+    rotateX: 15deg
+    rotateY: 15deg
+    scale: 1.05
+  }
+
+  fn render() {
+    return <div class="card-3d">
+      <div class="card-front">Front</div>
+      <div class="card-back">Back</div>
+    </div>
+  }
+}

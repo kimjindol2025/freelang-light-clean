@@ -1,0 +1,19 @@
+// Phase 10.6: E2E Test File - Micro-interaction Component
+
+component InteractiveButton {
+  @micro {
+    onHover: scale(1.1)
+    onActive: scale(0.95)
+    transition: 200ms
+  }
+
+  @micro ripple {
+    effect: ripple
+    origin: center
+    duration: 600ms
+  }
+
+  fn render() {
+    return <button class="interactive-btn">Interact</button>
+  }
+}

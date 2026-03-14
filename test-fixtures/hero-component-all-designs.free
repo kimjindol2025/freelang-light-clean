@@ -1,0 +1,61 @@
+// Phase 10.6: E2E Test File - Comprehensive Component with All Design Types
+
+component HeroSection {
+  // Animation: Fade in the hero content
+  @animation fadeIn {
+    duration: 800
+    opacity: 0 → 1
+    easing: ease-out
+  }
+
+  @animation slideUpText {
+    duration: 600
+    delay: 200
+    transform: translateY(30px) → translateY(0)
+  }
+
+  // Glassmorphism: Blurred overlay effect
+  @glass {
+    background: rgba(0,0,0,0.3)
+    backdropFilter: blur(8px)
+  }
+
+  @glass headerOverlay {
+    background: rgba(255,255,255,0.05)
+    backdropFilter: blur(20px)
+    padding: 20px
+  }
+
+  // 3D Transform: Interactive depth
+  @3d {
+    perspective: 1200px
+  }
+
+  @3d cardHover {
+    rotateX: -5deg
+    rotateY: -5deg
+    translateZ: 20px
+  }
+
+  // Micro-interaction: Button feedback
+  @micro {
+    onHover: scale(1.05)
+    onActive: scale(0.98)
+    transition: 150ms cubic-bezier(0.4, 0, 0.2, 1)
+  }
+
+  // Scroll Trigger: Reveal on scroll
+  @scroll {
+    trigger: .hero-title
+    start: top 80%
+    end: top 20%
+  }
+
+  fn render() {
+    return <section class="hero">
+      <div class="hero-title">Welcome to FreeLang</div>
+      <div class="hero-subtitle">Unified Language for Web</div>
+      <button class="cta-button">Get Started</button>
+    </section>
+  }
+}
