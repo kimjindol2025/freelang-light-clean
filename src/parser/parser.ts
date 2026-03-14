@@ -81,7 +81,8 @@ import {
   LocalVaultConfig,   // Native-JSON-Vault: @local_vault(...) 설정
   TypeAliasDeclaration,   // Reified-Type-System: type X = A | B
   StaticAssertDeclaration, // Reified-Type-System: @static_assert_size<T, N>
-  GenericTypeParam        // Reified-Type-System: 제네릭 타입 파라미터
+  GenericTypeParam,        // Reified-Type-System: 제네릭 타입 파라미터
+  DesignBlockDeclaration   // Phase 10: Design directives (@animation, @glass, @3d, @micro, @scroll)
 } from './ast';
 
 /**
@@ -460,6 +461,7 @@ export class Parser {
     const imports: ImportStatement[] = [];
     const exports: ExportStatement[] = [];
     const statements: Statement[] = [];
+    const designBlocks: DesignBlockDeclaration[] = [];  // Phase 10: Design directives
     let lintConfig: LintConfig | undefined;
     let allowOrigins: string[] | undefined;  // Hardware-CORS: @allow_origin(...)
     let cspPolicy: string | undefined;       // Native-CSP-Shield: @csp_policy(...)
@@ -1089,12 +1091,15 @@ export class Parser {
           }
         }
 
-        // Separate imports/exports from other statements
+        // Separate imports/exports/designBlocks from other statements
         // Check statement type using type field
         if (stmt.type === 'import') {
           imports.push(stmt as ImportStatement);
         } else if (stmt.type === 'export') {
           exports.push(stmt as ExportStatement);
+        } else if (stmt.type === 'animation' || stmt.type === 'glass' || stmt.type === '3d' || stmt.type === 'micro' || stmt.type === 'scroll') {
+          // Phase 10: Design blocks
+          designBlocks.push(stmt as DesignBlockDeclaration);
         } else {
           statements.push(stmt);
         }
@@ -1111,6 +1116,7 @@ export class Parser {
       imports,
       exports,
       statements,
+      designBlocks: designBlocks.length > 0 ? designBlocks : undefined,  // Phase 10: Design directives
       lintConfig,     // Native-Linter: @lint(...) 어노테이션 설정
       allowOrigins,   // Hardware-CORS: @allow_origin(...) 도메인 화이트리스트
       cspPolicy,      // Native-CSP-Shield: @csp_policy(...) 정책 문자열
@@ -2258,6 +2264,11 @@ export class Parser {
       return this.parseStyleDeclaration();
     }
 
+    // Phase 10: Design Directives (@animation, @glass, @3d, @micro, @scroll)
+    if (this.isDesignDirective()) {
+      return this.parseDesignBlock();
+    }
+
     // Self-Testing Compiler: test 블록
     // 릴리즈 모드에서는 IR Generator가 skip, --test 모드에서만 실행
     // test() 함수 호출과 구분: 다음 토큰이 STRING이면 test 블록, '('이면 함수 호출
@@ -2287,6 +2298,127 @@ export class Parser {
       type: 'expression',
       expression: expr
     } as ExpressionStatement;
+  }
+
+  /**
+   * Phase 10: Check if current token is a design directive
+   */
+  private isDesignDirective(): boolean {
+    const tokenType = this.current().type;
+    return tokenType === TokenType.ANIMATION_DESIGN ||
+           tokenType === TokenType.GLASS_DESIGN ||
+           tokenType === TokenType.TRANSFORM3D_DESIGN ||
+           tokenType === TokenType.MICRO_DESIGN ||
+           tokenType === TokenType.SCROLL_DESIGN;
+  }
+
+  /**
+   * Phase 10: Parse design block directive
+   *
+   * 지원 형식:
+   *   @animation fadeIn {
+   *     duration: 300
+   *     opacity: 0 → 1
+   *   }
+   *
+   *   @glass {
+   *     background: rgba(255, 255, 255, 0.1)
+   *     backdropFilter: blur(10px)
+   *   }
+   *
+   * 디자인 타입:
+   *   - animation: CSS 키프레임 애니메이션
+   *   - glass: Glassmorphism 효과
+   *   - 3d: 3D 변환
+   *   - micro: 마이크로 인터랙션
+   *   - scroll: 스크롤 트리거
+   */
+  private parseDesignBlock(): DesignBlockDeclaration {
+    const line = this.current().line;
+    const column = this.current().column;
+
+    // 디자인 지시문 토큰 읽기 (@animation, @glass, @3d, @micro, @scroll)
+    const designToken = this.current();
+    const designType = this.getDesignTypeFromToken(designToken.type);
+    this.advance();
+
+    // 블록 이름 (선택사항)
+    let name: string | undefined;
+    if (this.check(TokenType.IDENT)) {
+      name = this.expectIdent('Expected design block name or {').value;
+    }
+
+    // { 블록 시작
+    this.expect(TokenType.LBRACE, 'Expected "{" to start design block');
+
+    // 블록 내용 수집
+    let content = '';
+    let braceCount = 1;
+    let depth = 1;
+
+    while (depth > 0 && !this.isAtEnd()) {
+      const token = this.current();
+
+      if (token.type === TokenType.LBRACE) {
+        braceCount++;
+        depth++;
+      } else if (token.type === TokenType.RBRACE) {
+        braceCount--;
+        depth--;
+        if (depth === 0) break;  // 마지막 } 는 consume하지 않음
+      }
+
+      // 토큰을 문자열로 변환
+      if (token.value) {
+        content += token.value;
+      } else {
+        content += token.type;
+      }
+      content += ' ';
+
+      this.advance();
+    }
+
+    // } 블록 끝
+    this.expect(TokenType.RBRACE, 'Expected "}" to close design block');
+
+    // 선택적 세미콜론
+    this.match(TokenType.SEMICOLON);
+
+    // 블록 내용 정리 (공백 정리)
+    content = content.trim();
+
+    return {
+      type: designType,
+      name: name,
+      content: content,
+      line: line,
+      column: column
+    } as DesignBlockDeclaration;
+  }
+
+  /**
+   * Phase 10: Get design type from TokenType
+   */
+  private getDesignTypeFromToken(tokenType: TokenType): 'animation' | 'glass' | '3d' | 'micro' | 'scroll' {
+    switch (tokenType) {
+      case TokenType.ANIMATION_DESIGN:
+        return 'animation';
+      case TokenType.GLASS_DESIGN:
+        return 'glass';
+      case TokenType.TRANSFORM3D_DESIGN:
+        return '3d';
+      case TokenType.MICRO_DESIGN:
+        return 'micro';
+      case TokenType.SCROLL_DESIGN:
+        return 'scroll';
+      default:
+        throw new ParseError(
+          this.current().line,
+          this.current().column,
+          `Unknown design directive: ${tokenType}`
+        );
+    }
   }
 
   /**
