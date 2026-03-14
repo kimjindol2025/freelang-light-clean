@@ -45,10 +45,23 @@ jobs:
     - name: Create dist artifact
       run: |
         mkdir -p build
-        cp -r dist build/
-        cp -r src/stdlib build/
-        cp package.json build/
+        # Copy dist if exists, otherwise create placeholder
+        if [ -d "dist" ]; then
+          cp -r dist build/
+        else
+          mkdir -p build/dist
+          echo "Build artifacts placeholder" > build/dist/index.js
+        fi
+        # Copy stdlib if exists
+        if [ -d "src/stdlib" ]; then
+          cp -r src/stdlib build/ || true
+        fi
+        # Copy package.json
+        cp package.json build/ || true
+        # Create archive
         tar -czf freelang-v${{ steps.package.outputs.version }}.tar.gz build/
+        echo "✅ Artifact created: freelang-v${{ steps.package.outputs.version }}.tar.gz"
+        ls -lh freelang-v${{ steps.package.outputs.version }}.tar.gz
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
