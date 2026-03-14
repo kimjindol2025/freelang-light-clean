@@ -111,6 +111,42 @@ export class ProgramRunner {
   }
 
   /**
+   * Phase 10.5: Parse FreeLang code without executing
+   *
+   * 목적: Parser→AST 생성만 수행 (실행 없음)
+   * 사용처: Design 블록 컴파일, 정적 분석 등
+   *
+   * @param source FreeLang 소스 코드
+   * @returns Module AST (designBlocks 포함)
+   */
+  parseString(source: string): any {
+    try {
+      // 1. Tokenize: Lexer → TokenBuffer
+      const lexer = new Lexer(source);
+      const tokenBuffer = new TokenBuffer(lexer, { preserveNewlines: false });
+
+      // 2. Parse: TokenBuffer → Module AST
+      const parser = new Parser(tokenBuffer);
+      const module = parser.parseModule() as any;
+
+      return module;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Phase 10.5: Parse FreeLang file without executing
+   *
+   * @param filePath .free 파일 경로
+   * @returns Module AST (designBlocks 포함)
+   */
+  parseFile(filePath: string): any {
+    const source = require('fs').readFileSync(filePath, 'utf-8');
+    return this.parseString(source);
+  }
+
+  /**
    * Run program from string
    * Phase 1: Full Lexer→Parser pipeline
    * Phase 2: Function registration before execution

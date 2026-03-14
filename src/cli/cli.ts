@@ -7,6 +7,7 @@ import * as path from 'path';
 import { ProgramRunner } from './runner';
 import { compileAOT } from './aot-compiler';
 import { ProofTester } from './test-runner';
+import DesignCLIHelper from './design-cli-helper';
 
 interface CLIOptions {
   verbose?: boolean;
@@ -16,6 +17,8 @@ interface CLIOptions {
   output?: string;      // Phase 5: Output binary path
   test?: boolean;       // Self-Testing Compiler: --test 플래그
   pattern?: string;     // --pattern 테스트 파일 필터
+  designs?: boolean;    // Phase 10.5: Compile design directives
+  designOutput?: string; // Phase 10.5: Design artifact output path
 }
 
 export class FreeLangCLI {
@@ -55,6 +58,12 @@ export class FreeLangCLI {
         options.test = true;
       } else if (arg === '--pattern' || arg === '-p') {
         options.pattern = restArgs[++i];
+      } else if (arg === '--designs') {
+        // Phase 10.5: Compile design directives
+        options.designs = true;
+      } else if (arg === '--design-output') {
+        // Phase 10.5: Design artifact output directory
+        options.designOutput = restArgs[++i];
       } else if (!arg.startsWith('-')) {
         file = arg;
       }
@@ -87,6 +96,8 @@ Options:
   -o, --output <path>       Output binary path (with --aot)
   --test                    Build/run in test mode (executes test blocks)
   -p, --pattern <str>       Filter test files by name pattern
+  --designs                 Compile design directives (@animation, @glass, @3d, @micro, @scroll)
+  --design-output <path>    Output directory for design artifacts (CSS + JavaScript)
 
 Examples:
   freelang run program.free
@@ -96,6 +107,7 @@ Examples:
   freelang test src/ --pattern core  # src/에서 'core' 포함 파일만
   freelang build --test program.fl   # 테스트 빌드 (test 블록 포함)
   freelang run program.free --aot -o program_bin
+  freelang build program.free --designs --design-output ./design-artifacts  # Phase 10.5
 `);
   }
 
@@ -245,6 +257,39 @@ Examples:
             return 1;
           }
 
+          // Phase 10.5: Design 블록 컴파일
+          if (options.designs) {
+            try {
+              const designOutput = options.designOutput || './design-artifacts';
+
+              // 파일 파싱 (실행하지 않음)
+              const module = this.runner.parseFile(file);
+
+              if (!module) {
+                console.error('Error: Failed to parse file');
+                return 1;
+              }
+
+              // Design 블록 컴파일
+              const result = DesignCLIHelper.compileDesigns(
+                file,
+                designOutput,
+                module,
+                options.verbose || false
+              );
+
+              // 결과 출력
+              DesignCLIHelper.printResult(result, file, options.verbose || false);
+
+              return result.success ? 0 : 1;
+            } catch (error) {
+              console.error(
+                `Design compilation error: ${error instanceof Error ? error.message : String(error)}`
+              );
+              return 1;
+            }
+          }
+
           if (options.test) {
             // 테스트 빌드: test 블록을 실행 모드로 진입
             const tester = new ProofTester({ verbose: options.verbose });
@@ -267,7 +312,7 @@ Examples:
             return 0;
           }
 
-          console.error('Error: build requires --test or --aot flag');
+          console.error('Error: build requires --test, --aot, or --designs flag');
           return 1;
         }
 
