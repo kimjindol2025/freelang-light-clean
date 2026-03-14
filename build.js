@@ -38,5 +38,27 @@ Object.entries(indexFiles).forEach(([file, content]) => {
   }
 });
 
+// Copy src/stdlib to dist if it exists
+const copyDir = (src, dest) => {
+  if (!fs.existsSync(src)) return false;
+  if (!fs.existsSync(dest)) {
+    fs.mkdirSync(dest, { recursive: true });
+  }
+  fs.readdirSync(src).forEach(file => {
+    const srcFile = path.join(src, file);
+    const destFile = path.join(dest, file);
+    if (fs.statSync(srcFile).isDirectory()) {
+      copyDir(srcFile, destFile);
+    } else if (!fs.existsSync(destFile)) {
+      fs.copyFileSync(srcFile, destFile);
+    }
+  });
+  return true;
+};
+
+if (copyDir('src/stdlib', 'dist/stdlib')) {
+  console.log(`✅ Copied src/stdlib to dist/stdlib`);
+}
+
 console.log('\n✅ Build complete!');
 console.log(`📦 Output: dist/`);
